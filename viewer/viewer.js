@@ -8,6 +8,7 @@ var display = {
     "betadown": false,
     "nosatellite": false,
     "snr": false,
+    "strict": false
 };
 
 var lengthBox = document.getElementById("stripeLength")
@@ -95,6 +96,7 @@ attachCheckbox("obstructed");
 attachCheckbox("betadown");
 attachCheckbox("nosatellite");
 attachCheckbox("snr");
+attachCheckbox("strict");
 
 function attachButtons(prefix, actionFunc) {
     var buttons = {
@@ -146,13 +148,16 @@ function plot() {
     for (var i = offset; i < data.length; i++) {
         var boxX = ((i-offset) % stripeLength) * boxWidth
         var boxY = Math.floor((i-offset) / stripeLength) * boxHeight
-        if (display["snr"] && data[i].n < 9) {
+        if (display["snr"] &&
+            ((!display["strict"] && data[i].n < 9) ||
+             (display["strict"] && data[i].n == 0))) {
             viewer.append(makeBox(boxX, boxY, "#999999", 1-(data[i].n/9)));
         }
         if (((display["obstructed"] && data[i].o) ||
              (display["nosatellite"] && !data[i].s) ||
              (display["betadown"] && data[i].s && !data[i].o)) &&
-             data[i].d < 1) {
+            ((!display["strict"] && data[i].d > 0) ||
+             (display["strict"] && data[i].d == 1))) {
 
             var red = (data[i].o && display["obstructed"]) ? "ff" : "00"
             var green = (!data[i].s && display["nosatellite"]) ? "ff" : "00"

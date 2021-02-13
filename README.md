@@ -131,6 +131,12 @@ The checkboxes determine which data is displayed.
    signal-to-noise ratio. Rectangles will be darker grey when the
    signal was low and the noise was high.
 
+ * "strict": Reduce the rendering to only cases where all pings were
+   dropped for the second (d=1) for obstructed, beta downtime, and no
+   satellites. This seems to be what the "Ping Success" plot at the
+   top of Starlink's own statistics view shows. This checkbox also
+   reduces the signal-to-noise ratio plot to only cases where snr=0.
+
 ## Results
 
 The idea behind the viewer is that the beam between the dish and the

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+  <dict>
+    <key>Label</key>
+    <string>com.beerriot.starlink.collection</string>
+    <key>Program</key>
+    <string>/Users/bryan/projects/starlink-ping-loss-viewer/downloader/fetch-data.sh</string>
+    <key>WorkingDirectory</key>
+    <string>/Users/bryan/projects/starlink-ping-loss-viewer/data</string>
+    <key>StartCalendarInterval</key>
+    <dict>
+      <key>Minute</key>
+      <integer>3</integer>
+    </dict>
+  </dict>
+</plist>

@@ -149,5 +149,5 @@ succession of sweeps across the scene. If the dish connects to the
 next dish in the ring at a regular interval, then syncing up the sweep
 with the viewer should produce a scan of that region of the sky.
 
-Updates on what I've found will be shared on
-(https://blog.beerriot.com).
+Updates on what I've found so far are shared at
+(http://blog.beerriot.com/2021/02/14/starlink-raster-scan/).

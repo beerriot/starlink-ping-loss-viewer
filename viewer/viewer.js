@@ -1,5 +1,5 @@
 var data=[]
-var stripeLength=900
+var stripeLength=600
 var offset=0
 var boxWidth=3
 var boxHeight=3
@@ -8,8 +8,15 @@ var display = {
     "betadown": false,
     "nosatellite": false,
     "snr": false,
-    "strict": false
+    "strict": false,
+    "connected": false
 };
+var connectedParams = {
+    "minSec": 1800,
+    "maxD": 1,
+    "maxDSec": 2,
+};
+var connectedSpans = null;
 
 var lengthBox = document.getElementById("stripeLength")
 var offsetBox = document.getElementById("offset")
@@ -82,6 +89,28 @@ attachInput(boxHeightBox, function(newVal) {
     return boxHeight
 });
 
+attachInput(document.getElementById("connectedMinSpan"), function(newVal) {
+    if (newVal != null) {
+        connectedParams.minSec = newVal;
+        connectedSpans = null;
+    }
+    return connectedParams.minSec;
+});
+attachInput(document.getElementById("connectedMaxD"), function(newVal) {
+    if (newVal != null) {
+        connectedParams.maxD = newVal;
+        connectedSpans = null;
+    }
+    return connectedParams.maxD;
+});
+attachInput(document.getElementById("connectedMaxDSpan"), function(newVal) {
+    if (newVal != null) {
+        connectedParams.maxDSec = newVal;
+        connectedSpans = null;
+    }
+    return connectedParams.maxDSec;
+});
+
 function attachCheckbox(name) {
     var checkbox = document.getElementById(name);
     if (display[name]) {
@@ -97,6 +126,7 @@ attachCheckbox("betadown");
 attachCheckbox("nosatellite");
 attachCheckbox("snr");
 attachCheckbox("strict");
+attachCheckbox("connected");
 
 function attachButtons(prefix, actionFunc) {
     var buttons = {
@@ -137,6 +167,32 @@ function plot() {
     if (viewer) {
         viewer.remove();
     }
+
+    if (display["connected"] && connectedSpans == null) {
+        connectedSpans = [];
+
+        var runLength = 0;
+        var dLength = 0;
+        for (var i = 0; i < data.length; i++) {
+            if (data[i].d < connectedParams.maxD) {
+                dLength = 0;
+                runLength += 1;
+            } else {
+                dLength += 1;
+                if (dLength > connectedParams.maxDSec) {
+                    if (runLength >= connectedParams.minSec) {
+                        connectedSpans.push({"start":i-runLength, "end":i});
+                    }
+                    runLength = 0;
+                } else {
+                    runLength += 1;
+                }
+            }
+        }
+        if (runLength >= connectedParams.minSec) {
+            connectedSpans.push({"start":data.length-runLength, "end":data.length});
+        }
+    }
     
     viewer = document.createElementNS("http://www.w3.org/2000/svg", "svg")
     viewer.setAttribute("id", "viewer")
@@ -153,18 +209,29 @@ function plot() {
              (display["strict"] && data[i].n == 0))) {
             viewer.append(makeBox(boxX, boxY, "#999999", 1-(data[i].n/9)));
         }
+        if (display["connected"]) {
+            for (var j = 0; j < connectedSpans.length; j++) {
+                if (i >= connectedSpans[j].start && i < connectedSpans[j].end) {
+                    viewer.append(makeBox(boxX, boxY, "#ffee00", 1));
+                    break;
+                }
+            }
+        }
         if (((display["obstructed"] && data[i].o) ||
              (display["nosatellite"] && !data[i].s) ||
              (display["betadown"] && data[i].s && !data[i].o)) &&
             ((!display["strict"] && data[i].d > 0) ||
              (display["strict"] && data[i].d == 1))) {
 
-            var red = (data[i].o && display["obstructed"]) ? "ff" : "00"
-            var green = (!data[i].s && display["nosatellite"]) ? "ff" : "00"
-            var blue = (!data[i].o && data[i].s && display["betadown"]) ? "ff" : "00"
-            color = "#"+red+green+blue
-            if (color == "#ffffff") {
-                color = "#000000"
+            var color = "#cc00ff"
+            if (!data[i].s && display["nosatellite"]) {
+                color = "#00ff00"
+            } else if (!data[i].o && data[i].s && display["betadown"]) {
+                // beta downtime
+                color = "#0000ff"
+            } else if (data[i].o && display["obstructed"]) {
+                // obstruction
+                color = "#ff0000"
             }
             
             var opacity = data[i].d

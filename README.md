@@ -137,6 +137,17 @@ The checkboxes determine which data is displayed.
    top of Starlink's own statistics view shows. This checkbox also
    reduces the signal-to-noise ratio plot to only cases where snr=0.
 
+ * "connected": Highlight areas where a connection was maintained at
+   the specified quality for the at least the specified time. "Min < D
+   Sec" specifies the amount of time the connection had to be
+   maintained. "Max D" is the ping loss level, at or above which the
+   connection is considered broken. "Max D Sec" is the amount of time
+   the ping loss needed to stay above "Max D" to be considered
+   broken. For example, "Min < D Sec" = 1800, "Max D" = 1, "Max D Sec"
+   = 2, means highligh areas where at least 30 minutes passed where
+   the ping loss level was never 100% for more than two consecutive
+   seconds.
+
 ## Results
 
 The idea behind the viewer is that the beam between the dish and the

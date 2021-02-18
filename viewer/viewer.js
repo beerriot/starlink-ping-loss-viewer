@@ -1,4 +1,5 @@
 var data=[]
+var startdate=null
 var stripeLength=600
 var offset=0
 var boxWidth=3
@@ -239,14 +240,48 @@ function plot() {
         }
     }
 
+    var tooltip = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    tooltip.setAttribute("opacity", 0);
+    var time = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    time.innerHTML = "hello";
+    tooltip.append(time);
+    viewer.append(tooltip);
+
     document.body.append(viewer)
+    var mouseoffsetx = 10
+    var mouseoffsety = 10
+
+    viewer.addEventListener("mouseenter", function() {
+        tooltip.setAttribute("opacity", 1);
+    });
+    viewer.addEventListener("mouseleave", function() {
+        tooltip.setAttribute("opacity", 0);
+    });
+    viewer.addEventListener("mousemove", function(l) {
+        var svgx = l.offsetX;
+        var svgy = l.offsetY;
+        tooltip.setAttribute("transform", "translate("+(svgx+mouseoffsetx)+","+(svgy+mouseoffsety)+")");
+
+        var index = Math.floor(svgy/boxHeight)*stripeLength + Math.floor(svgx/boxWidth)
+        var hereDate = startdate ? new Date(startdate) : ""
+        startdate && hereDate.setSeconds(hereDate.getSeconds() + index);
+        time.innerHTML = index + " " + hereDate;
+    });
+
 }
 
 function loadData() {
     if (this.status == 200) {
         console.log("Received data "+this.responseText.length+" bytes");
         var jsondata = JSON.parse(this.responseText);
+
         data = jsondata.data;
+
+        var lastfilename = (jsondata.filenames.length > 1) && jsondata.filenames[jsondata.filenames.length-1]
+        var dateparts = lastfilename.match(/(\d\d\d\d)-(\d\d)-(\d\d)-(\d\d)(\d\d)(\d\d).json/)
+        startdate = dateparts.length == 7 && new Date(dateparts[1], parseInt(dateparts[2])-1, dateparts[3], dateparts[4], dateparts[5], dateparts[6])
+        startdate.setSeconds(startdate.getSeconds() - data.length);
+
         plot();
     } else {
         console.log("Received non-200 status: "+this.status);

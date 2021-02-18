@@ -148,6 +148,10 @@ The checkboxes determine which data is displayed.
    the ping loss level was never 100% for more than two consecutive
    seconds.
 
+If you place your mouse over the rendering, a tooltip will display the
+offset into the data array, as well as the date and time of that
+sample, at the position of your pointer.
+
 ## Results
 
 The idea behind the viewer is that the beam between the dish and the

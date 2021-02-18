@@ -14,7 +14,6 @@ var display = {
 };
 var connectedParams = {
     "minSec": 1800,
-    "maxD": 1,
     "maxDSec": 2,
 };
 var connectedSpans = null;
@@ -97,13 +96,6 @@ attachInput(document.getElementById("connectedMinSpan"), function(newVal) {
     }
     return connectedParams.minSec;
 });
-attachInput(document.getElementById("connectedMaxD"), function(newVal) {
-    if (newVal != null) {
-        connectedParams.maxD = newVal;
-        connectedSpans = null;
-    }
-    return connectedParams.maxD;
-});
 attachInput(document.getElementById("connectedMaxDSpan"), function(newVal) {
     if (newVal != null) {
         connectedParams.maxDSec = newVal;
@@ -119,6 +111,7 @@ function attachCheckbox(name) {
     }
     checkbox.addEventListener("change", function() {
         display[name] = checkbox.checked
+        connectedSpans = null;
         plot()
     })
 }
@@ -163,6 +156,14 @@ function makeBox(x, y, color, opacity) {
     return box
 }
 
+function shouldShowDropAt(index) {
+    return ((display["obstructed"] && data[index].o) ||
+            (display["nosatellite"] && !data[index].s) ||
+            (display["betadown"] && data[index].s && !data[index].o)) &&
+        ((!display["strict"] && data[index].d > 0) ||
+         (display["strict"] && data[index].d == 1));
+}
+
 function plot() {
     var viewer = document.getElementById("viewer")
     if (viewer) {
@@ -175,7 +176,7 @@ function plot() {
         var runLength = 0;
         var dLength = 0;
         for (var i = 0; i < data.length; i++) {
-            if (data[i].d < connectedParams.maxD) {
+            if (!shouldShowDropAt(i)) {
                 dLength = 0;
                 runLength += 1;
             } else {
@@ -218,12 +219,7 @@ function plot() {
                 }
             }
         }
-        if (((display["obstructed"] && data[i].o) ||
-             (display["nosatellite"] && !data[i].s) ||
-             (display["betadown"] && data[i].s && !data[i].o)) &&
-            ((!display["strict"] && data[i].d > 0) ||
-             (display["strict"] && data[i].d == 1))) {
-
+        if (shouldShowDropAt(i)) {
             var color = "#cc00ff"
             if (!data[i].s && display["nosatellite"]) {
                 color = "#00ff00"

@@ -138,15 +138,18 @@ The checkboxes determine which data is displayed.
    reduces the signal-to-noise ratio plot to only cases where snr=0.
 
  * "connected": Highlight areas where a connection was maintained at
-   the specified quality for the at least the specified time. "Min < D
-   Sec" specifies the amount of time the connection had to be
-   maintained. "Max D" is the ping loss level, at or above which the
-   connection is considered broken. "Max D Sec" is the amount of time
-   the ping loss needed to stay above "Max D" to be considered
-   broken. For example, "Min < D Sec" = 1800, "Max D" = 1, "Max D Sec"
-   = 2, means highligh areas where at least 30 minutes passed where
-   the ping loss level was never 100% for more than two consecutive
-   seconds.
+   the specified quality for the at least the specified time. Quality
+   is specified by the "obstructed", "beta downtime", "no satellites",
+   and "strict" checkboxes. If any red, blue, or green rectangle is
+   shown at a sample point, that point is considered below quality. It
+   probably makes the most sense to use this with "strict"
+   enabled. "Min Clear Sec" specifies the number of seconds that the
+   span must cover to be highlighted. "Max Down Sec" specifies the
+   number of consecutive seconds of below-quality service allowed
+   before considering the span ended. For example, "Min Clear Sec" =
+   1800, "Max Down Sec" = 2, means highlight areas were at least 30
+   minutes passed where no ping loss was displayed for more than two
+   consecutive seconds.
 
 If you place your mouse over the rendering, a tooltip will display the
 offset into the data array, as well as the date and time of that

@@ -1,9 +1,50 @@
-var data=[]
-var startdate=null
-var stripeLength=600
-var offset=0
-var boxWidth=3
-var boxHeight=3
+// Samples will be loaded here.
+var data = []
+// Datetime of earliest sample.
+var startdate = null;
+// Computed by analyzing `data` at plot time.
+var connectedSpans = null;
+
+// Rendering parameters are functions with captured values. The
+// function alters the captured value by the passed amount, and
+// returns the result after constraining it to the minimum and maximum
+// configured at creation. Call with no parameters to read the value
+// without modification.
+function constrainedValue(min, max, clearsConnectivity = true) {
+    var currentValue =
+        Math.min(max || Number.MAX_SAFE_INTEGER,
+                 Math.max(min || 0, Number.MIN_SAFE_INTEGER))
+    return function(change = 0) {
+        if (change != 0 && clearsConnectivity) {
+            connectedSpans = null;
+        }
+
+        currentValue += change
+        if (min) {
+            currentValue = Math.max(currentValue, min);
+        }
+        if (max) {
+            currentValue = Math.min(currentValue, max);
+        }
+        return currentValue;
+    }
+};
+
+// Samples per row.
+var stripeLengthV = constrainedValue(0, null, false);
+stripeLengthV(600);
+
+// Which sample to start the plot with.
+var offsetV = constrainedValue(0, null, false);
+offsetV(0);
+
+// Size of a rendered sample.
+var boxWidthV = constrainedValue(1, null, false);
+boxWidthV(1); // == 1 + 1 == 2
+var boxHeightV = constrainedValue(1, null, false);
+boxHeightV(1); // == 1 + 1 == 2
+
+// Which items to display.
 var display = {
     "obstructed": true,
     "betadown": false,
@@ -11,43 +52,43 @@ var display = {
     "snr": false,
     "connected": false
 };
-var minLossRatio = 1.0
-var maxSnr = 0.0
-var connectedParams = {
-    "minSec": 1800,
-    "maxDSec": 2,
-};
-var connectedSpans = null;
 
-var lengthBox = document.getElementById("stripeLength")
-var offsetBox = document.getElementById("offset")
-var boxWidthBox = document.getElementById("boxWidth")
-var boxHeightBox = document.getElementById("boxHeight")
-var minLossRatioBox = document.getElementById("minlossratio")
-var maxSnrBox = document.getElementById("maxsnr")
+// Smallest data[i].d to render.
+var minLossRatioV = constrainedValue(0, 1);
+minLossRatioV(1);
 
-function lengthButtonClick(value) {
-    stripeLength = Math.max(1, stripeLength+value)
-    lengthBox.value = stripeLength
-    plot()
-}
+// Largest data[i].n to render.
+var maxSnrV = constrainedValue(0, 9);
+maxSnrV(-9); // == 9 - 9 == 0
 
-function offsetButtonClick(value) {
-    offset = Math.max(0, offset+value)
-    offsetBox.value = offset
-    plot()
-}
+// What constitues a connected region.
+var connectedMinSecV = constrainedValue(1);
+connectedMinSecV(1799); // == 1 + 1799 == 1800
+var connectedMaxDSecV = constrainedValue(0);
+connectedMaxDSecV(2);
 
-function boxWidthButtonClick(value) {
-    boxWidth = Math.max(1, boxWidth+value)
-    boxWidthBox.value = boxWidth
-    plot()
-}
-
-function boxHeightButtonClick(value) {
-    boxHeight = Math.max(1, boxHeight+value)
-    boxHeightBox.value = boxHeight
-    plot()
+function attachButtons(prefix, value, textInput) {
+    var buttons = {
+        "minus30": -30,
+        "minus10": -10,
+        "minus1": -1,
+        "plus1": 1,
+        "plus10": 10,
+        "plus30": 30
+    };
+    var thunker = function(change) {
+        return function() {
+            var newVal = value(change);
+            textInput.value = newVal;
+            plot();
+        }
+    };
+    for (var key in buttons) {
+        var b = document.getElementById(prefix+"_"+key);
+        if (b) {
+            b.addEventListener("click", thunker(buttons[key]));
+        }
+    }
 }
 
 function inputChangeThunk(input, setter, parser = parseInt) {
@@ -59,69 +100,43 @@ function inputChangeThunk(input, setter, parser = parseInt) {
         }
     }
 }
-function attachInput(input, setter, parser) {
-    input.value = setter()
-    input.addEventListener("change", inputChangeThunk(input, setter, parser))
+
+function attachInput(name, value, parser = parseInt) {
+    var input = document.getElementById(name);
+
+    // Display the initial value
+    input.value = value()
+
+    input.addEventListener("change", function() {
+        var newVal = parser(input.value);
+        if (!isNaN(newVal)) {
+            // The value function takes a change, not an absolute. So
+            // compute the delta between its current value and the new
+            // value, and send that as the change.
+            input.value = value(newVal + (-1 * value()));
+            plot();
+        } else {
+            // If the input was invalid, replace it with what is
+            // already stored. No need to re-render.
+            input.value = value();
+        }
+    });
+
+    return input;
 }
 
-attachInput(lengthBox, function(newVal) {
-    if (newVal != null) {
-        stripeLength = Math.max(1, newVal)
-    }
-    return stripeLength
-});
-
-attachInput(offsetBox, function(newVal) {
-    if (newVal != null) {
-        offset = Math.max(0, newVal)
-    }
-    return offset
-});
-
-attachInput(boxWidthBox, function(newVal) {
-    if (newVal != null) {
-        boxWidth = Math.max(1, newVal)
-    }
-    return boxWidth
-});
-
-attachInput(boxHeightBox, function(newVal) {
-    if (newVal != null) {
-        boxHeight = Math.max(1, newVal)
-    }
-    return boxHeight
-});
-
-attachInput(minLossRatioBox, function(newVal) {
-    if (newVal != null) {
-        minLossRatio = Math.min(1.0, Math.max(0.0, newVal))
-        connectedSpans = null;
-    }
-    return minLossRatio
-}, parseFloat);
-
-attachInput(maxSnrBox, function(newVal) {
-    if (newVal != null) {
-        maxSnr = Math.min(9.0, Math.max(0.0, newVal))
-        connectedSpans = null;
-    }
-    return maxSnr
-}, parseFloat);
-
-attachInput(document.getElementById("connectedMinSpan"), function(newVal) {
-    if (newVal != null) {
-        connectedParams.minSec = newVal;
-        connectedSpans = null;
-    }
-    return connectedParams.minSec;
-});
-attachInput(document.getElementById("connectedMaxDSpan"), function(newVal) {
-    if (newVal != null) {
-        connectedParams.maxDSec = newVal;
-        connectedSpans = null;
-    }
-    return connectedParams.maxDSec;
-});
+attachButtons("stripeLength", stripeLengthV,
+              attachInput("stripeLength", stripeLengthV));
+attachButtons("offset", offsetV,
+              attachInput("offset", offsetV));
+attachButtons("boxWidth", boxWidthV,
+              attachInput("boxWidth", boxWidthV));
+attachButtons("boxHeight", boxHeightV,
+              attachInput("boxHeight", boxHeightV));
+attachInput("minLossRatio", minLossRatioV, parseFloat);
+attachInput("maxSnr", maxSnrV, parseFloat);
+attachInput("connectedMinSec", connectedMinSecV);
+attachInput("connectedMaxDSec", connectedMaxDSecV);
 
 function attachCheckbox(name) {
     var checkbox = document.getElementById(name);
@@ -140,41 +155,18 @@ attachCheckbox("nosatellite");
 attachCheckbox("snr");
 attachCheckbox("connected");
 
-function attachButtons(prefix, actionFunc) {
-    var buttons = {
-        "minus30": -30,
-        "minus10": -10,
-        "minus1": -1,
-        "plus1": 1,
-        "plus10": 10,
-        "plus30": 30
-    };
-    var thunker = function(value) { return function() { actionFunc(value) } };
-    for (var key in buttons) {
-        var b = document.getElementById(prefix+key);
-        if (b) {
-            b.addEventListener("click", thunker(buttons[key]));
-        }
-    }
-}
-
-attachButtons("stripeLength_", lengthButtonClick);
-attachButtons("offset_", offsetButtonClick);
-attachButtons("boxWidth_", boxWidthButtonClick);
-attachButtons("boxHeight_", boxHeightButtonClick);
-
-function makeBox(x, y, color, opacity) {
+function makeBox(width, height, x, y, color, opacity) {
     var box = document.createElementNS("http://www.w3.org/2000/svg", "rect")
     box.setAttribute("x", x)
     box.setAttribute("y", y)
-    box.setAttribute("width", boxWidth)
-    box.setAttribute("height", boxHeight)
+    box.setAttribute("width", width)
+    box.setAttribute("height", height)
     box.setAttribute("fill", color)
     box.setAttribute("fill-opacity", opacity)
     return box
 }
 
-function shouldShowDropAt(index) {
+function shouldShowDropAt(index, minLossRatio) {
     return ((display["obstructed"] && data[index].o) ||
             (display["nosatellite"] && !data[index].s) ||
             (display["betadown"] && data[index].s && !data[index].o)) &&
@@ -187,19 +179,33 @@ function plot() {
         viewer.remove();
     }
 
+    // Memoize current values, so we don't have to call their
+    // functions data.length times.
+    var stripeLength = stripeLengthV();
+    var offset = offsetV();
+    var boxWidth = boxWidthV();
+    var boxHeight = boxHeightV();
+    var minLossRatio = minLossRatioV();
+    var maxSnr = maxSnrV();
+
     if (display["connected"] && connectedSpans == null) {
         connectedSpans = [];
+
+        // More memoization, but these should only be needed during
+        // this recalculation.
+        var connectedMinSec = connectedMinSecV();
+        var connectedMaxDSec = connectedMaxDSecV();
 
         var runLength = 0;
         var dLength = 0;
         for (var i = 0; i < data.length; i++) {
-            if (!shouldShowDropAt(i)) {
+            if (!shouldShowDropAt(i, minLossRatio)) {
                 dLength = 0;
                 runLength += 1;
             } else {
                 dLength += 1;
-                if (dLength > connectedParams.maxDSec) {
-                    if (runLength >= connectedParams.minSec) {
+                if (dLength > connectedMaxDSec) {
+                    if (runLength >= connectedMinSec) {
                         connectedSpans.push({"start":i-runLength, "end":i});
                     }
                     runLength = 0;
@@ -208,7 +214,7 @@ function plot() {
                 }
             }
         }
-        if (runLength >= connectedParams.minSec) {
+        if (runLength >= connectedMinSec) {
             connectedSpans.push({"start":data.length-runLength, "end":data.length});
         }
     }
@@ -224,17 +230,17 @@ function plot() {
         var boxX = ((i-offset) % stripeLength) * boxWidth
         var boxY = Math.floor((i-offset) / stripeLength) * boxHeight
         if (display["snr"] && data[i].n <= maxSnr) {
-            viewer.append(makeBox(boxX, boxY, "#999999", 1-(data[i].n/9)));
+            viewer.append(makeBox(boxWidth, boxHeight, boxX, boxY, "#999999", 1-(data[i].n/9)));
         }
         if (display["connected"]) {
             for (var j = 0; j < connectedSpans.length; j++) {
                 if (i >= connectedSpans[j].start && i < connectedSpans[j].end) {
-                    viewer.append(makeBox(boxX, boxY, "#ffee00", 1));
+                    viewer.append(makeBox(boxWidth, boxHeight, boxX, boxY, "#ffee00", 1));
                     break;
                 }
             }
         }
-        if (shouldShowDropAt(i)) {
+        if (shouldShowDropAt(i, minLossRatio)) {
             var color = "#cc00ff"
             if (!data[i].s && display["nosatellite"]) {
                 color = "#00ff00"
@@ -247,7 +253,7 @@ function plot() {
             }
             
             var opacity = data[i].d
-            viewer.append(makeBox(boxX, boxY, color, opacity))
+            viewer.append(makeBox(boxWidth, boxHeight, boxX, boxY, color, opacity))
         }
     }
 

@@ -9,9 +9,10 @@ var display = {
     "betadown": false,
     "nosatellite": false,
     "snr": false,
-    "strict": false,
     "connected": false
 };
+var minLossRatio = 1.0
+var maxSnr = 0.0
 var connectedParams = {
     "minSec": 1800,
     "maxDSec": 2,
@@ -22,6 +23,8 @@ var lengthBox = document.getElementById("stripeLength")
 var offsetBox = document.getElementById("offset")
 var boxWidthBox = document.getElementById("boxWidth")
 var boxHeightBox = document.getElementById("boxHeight")
+var minLossRatioBox = document.getElementById("minlossratio")
+var maxSnrBox = document.getElementById("maxsnr")
 
 function lengthButtonClick(value) {
     stripeLength = Math.max(1, stripeLength+value)
@@ -47,18 +50,18 @@ function boxHeightButtonClick(value) {
     plot()
 }
 
-function inputChangeThunk(input, setter) {
+function inputChangeThunk(input, setter, parser = parseInt) {
     return function() {
-        var newVal = parseInt(input.value)
+        var newVal = parser(input.value)
         if (!isNaN(newVal)) {
             setter(newVal)
             plot()
         }
     }
 }
-function attachInput(input, setter) {
+function attachInput(input, setter, parser) {
     input.value = setter()
-    input.addEventListener("change", inputChangeThunk(input, setter))
+    input.addEventListener("change", inputChangeThunk(input, setter, parser))
 }
 
 attachInput(lengthBox, function(newVal) {
@@ -88,6 +91,22 @@ attachInput(boxHeightBox, function(newVal) {
     }
     return boxHeight
 });
+
+attachInput(minLossRatioBox, function(newVal) {
+    if (newVal != null) {
+        minLossRatio = Math.min(1.0, Math.max(0.0, newVal))
+        connectedSpans = null;
+    }
+    return minLossRatio
+}, parseFloat);
+
+attachInput(maxSnrBox, function(newVal) {
+    if (newVal != null) {
+        maxSnr = Math.min(9.0, Math.max(0.0, newVal))
+        connectedSpans = null;
+    }
+    return maxSnr
+}, parseFloat);
 
 attachInput(document.getElementById("connectedMinSpan"), function(newVal) {
     if (newVal != null) {
@@ -119,7 +138,6 @@ attachCheckbox("obstructed");
 attachCheckbox("betadown");
 attachCheckbox("nosatellite");
 attachCheckbox("snr");
-attachCheckbox("strict");
 attachCheckbox("connected");
 
 function attachButtons(prefix, actionFunc) {
@@ -160,8 +178,7 @@ function shouldShowDropAt(index) {
     return ((display["obstructed"] && data[index].o) ||
             (display["nosatellite"] && !data[index].s) ||
             (display["betadown"] && data[index].s && !data[index].o)) &&
-        ((!display["strict"] && data[index].d > 0) ||
-         (display["strict"] && data[index].d == 1));
+        (data[index].d >= minLossRatio);
 }
 
 function plot() {
@@ -206,9 +223,7 @@ function plot() {
     for (var i = offset; i < data.length; i++) {
         var boxX = ((i-offset) % stripeLength) * boxWidth
         var boxY = Math.floor((i-offset) / stripeLength) * boxHeight
-        if (display["snr"] &&
-            ((!display["strict"] && data[i].n < 9) ||
-             (display["strict"] && data[i].n == 0))) {
+        if (display["snr"] && data[i].n <= maxSnr) {
             viewer.append(makeBox(boxX, boxY, "#999999", 1-(data[i].n/9)));
         }
         if (display["connected"]) {

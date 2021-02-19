@@ -53,14 +53,27 @@
         </table>
       </div>
       <div>
-        <input id="obstructed" type="checkbox">obstructed</input>
-        <input id="betadown" type="checkbox">beta downtime</input>
-        <input id="nosatellite" type="checkbox">no satellites</input>
-        <input id="snr" type="checkbox">signal-to-noise ratio</input>
-        <input id="strict" type="checkbox">strict</input>
-      </div>
-      <div>
         <table>
+          <tr>
+            <td colspan="3">
+              <input id="obstructed" type="checkbox">obstructed</input>
+              <input id="betadown" type="checkbox">beta downtime</input>
+              <input id="nosatellite" type="checkbox">no satellites</input>
+            </td>
+            <td>
+              <div style="display: inline">
+                <input id="snr" type="checkbox">signal-to-noise ratio</input>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td colspan="3">
+              min loss ratio <input id="minlossratio" type="text" />
+            </td>
+            <td>
+              max snr <input id="maxsnr" type="text" />
+            </td>
+          </tr>
           <tr>
             <td><input id="connected" type="checkbox">connected</input></td>
             <td><input id="connectedMinSpan" type="text"></input></td>

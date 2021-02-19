@@ -131,25 +131,37 @@ The checkboxes determine which data is displayed.
    signal-to-noise ratio. Rectangles will be darker grey when the
    signal was low and the noise was high.
 
- * "strict": Reduce the rendering to only cases where all pings were
-   dropped for the second (d=1) for obstructed, beta downtime, and no
-   satellites. This seems to be what the "Ping Success" plot at the
-   top of Starlink's own statistics view shows. This checkbox also
-   reduces the signal-to-noise ratio plot to only cases where snr=0.
-
  * "connected": Highlight areas where a connection was maintained at
-   the specified quality for the at least the specified time. Quality
-   is specified by the "obstructed", "beta downtime", "no satellites",
-   and "strict" checkboxes. If any red, blue, or green rectangle is
-   shown at a sample point, that point is considered below quality. It
-   probably makes the most sense to use this with "strict"
-   enabled. "Min Clear Sec" specifies the number of seconds that the
-   span must cover to be highlighted. "Max Down Sec" specifies the
-   number of consecutive seconds of below-quality service allowed
-   before considering the span ended. For example, "Min Clear Sec" =
-   1800, "Max Down Sec" = 2, means highlight areas were at least 30
-   minutes passed where no ping loss was displayed for more than two
-   consecutive seconds.
+   the specified quality for the at least the specified time.
+
+A few text fields near these checkboxes alter how much of each
+category is displayed:
+
+ * "min loss ratio": Determines what ratio of pings must be dropped in
+   a sample in order for it to be rendered in the chart. The default
+   of 1 means "all pings must be dropped", which seems to be the
+   metric that Starlink uses for counting downtime. Valid values are
+   decimals between 0 and 1.
+
+ * "max snr": Determines highest signal-to-noise ratio worth
+   rendering. The default of 0 renders only the darkest grey boxes,
+   when signal is completely absent. Valid values are 0 to 9.
+
+ * "Min Clear Sec": The number of contiguous seconds that must elapse
+   for a region to be highlighted as connected (part one of "the
+   specified quality")
+
+ * "Max Down Sec": The number of contiguous seconds in which ping loss
+   is equal to or higher than "min loss ratio" before a contiguous
+   connected region is considered broken.
+
+The connected highlighting may be best explained by an example. If
+highlighting is enabled with "obstructed" enabled, "min loss ratio" at
+1, "Min Clear Sec" at 1800, and "Max Down Sec" at 2, then any region
+highlighted is a region at least 30 minutes long in which no
+obstruction causing total ping loss for more than two seconds
+occurred. This example is a metric I'm using to quantify how often a
+good-quality medium-length video call is possible.
 
 If you place your mouse over the rendering, a tooltip will display the
 offset into the data array, as well as the date and time of that

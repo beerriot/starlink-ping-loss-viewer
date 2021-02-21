@@ -371,6 +371,13 @@ function plotHistogramData() {
         }
     }
 
+    var normal = 0;
+    for (var i = 0; i < spanHisto.length; i++) {
+        for (var k in spanHisto[i]) {
+            normal = Math.max(normal, spanHisto[i][k][0]);
+        }
+    }
+
     var histo = document.getElementById("histo")
     if (histo) {
         histo.remove();
@@ -391,8 +398,8 @@ function plotHistogramData() {
 
     var addBar = function(index, value, color) {
         var x = index * barWidth;
-        var y = svgHeight - value;
-        var height = value;
+        var height = svgHeight * (value / normal);
+        var y = svgHeight - height;
 
         var bar = document.createElementNS("http://www.w3.org/2000/svg", "rect");
         bar.setAttribute("x", x);

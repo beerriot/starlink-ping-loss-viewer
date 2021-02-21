@@ -386,27 +386,66 @@ function plotHistogramData() {
 
     histo = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     histo.setAttribute("id", "histo");
-    var barWidth = 2;
-    var svgWidth = spanHisto.length * barWidth * plotCount;
-    var svgHeight = 200;
+
+    // 12 because there are 4 categories, and 12 is evenly divisible
+    // by any selection of that.
+    var bucketWidth = 12;
+    var graphWidth = bucketWidth * spanHisto.length;
+    var barWidth = bucketWidth/plotCount;
+    var graphHeight = 200;
+
+    var leftInset = 30;
+    var rightInset = 10;
+    var topInset = 10;
+    var bottomInset = 30;
+    var svgWidth = graphWidth + leftInset + rightInset;
+    var svgHeight = graphHeight + topInset + bottomInset;
     histo.setAttribute("width", svgWidth);
     histo.setAttribute("height", svgHeight);
+
+    var graph = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    // Flip the coordinate system upside down (while also shifting the
+    // graph into position) to make the bar-creating code simpler.
+    graph.setAttribute("transform", "matrix(1, 0, 0, -1, "+leftInset+", "+(graphHeight+topInset)+")");
+
+    for (var l = 0.25; l <= 1; l += 0.25) {
+        var grid = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+        grid.setAttribute("x", 0);
+        grid.setAttribute("y", l * graphHeight);
+        grid.setAttribute("width", graphWidth);
+        grid.setAttribute("height", 1);
+        grid.setAttribute("fill", "#eeeeee");
+        graph.append(grid);
+
+        var gridlabel = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        gridlabel.innerHTML = (normal * l);
+        gridlabel.setAttribute("x", 0);
+        gridlabel.setAttribute("y", topInset + graphHeight - (l * graphHeight));
+        histo.append(gridlabel);
+    }
 
     var addBar = function(index, value, color) {
         var x = index * barWidth;
         var height = svgHeight * (value / normal);
-        var y = svgHeight - height;
 
         var bar = document.createElementNS("http://www.w3.org/2000/svg", "rect");
         bar.setAttribute("x", x);
         bar.setAttribute("width", barWidth);
-        bar.setAttribute("y", y);
+        bar.setAttribute("y", 0);
         bar.setAttribute("height", height);
         bar.setAttribute("fill", color);
-        histo.append(bar);
+        graph.append(bar);
     }
 
     for (var i = 0; i < spanHisto.length; i++) {
+        if (i > 0 && i % 10 == 0) {
+            var gridlabel = document.createElementNS("http://www.w3.org/2000/svg", "text");
+            gridlabel.innerHTML = i < 60 ? i+"s" : (i-60)+"m";
+            gridlabel.setAttribute("x", i*bucketWidth);
+            gridlabel.setAttribute("y", svgHeight);
+            histo.append(gridlabel);
+        }
+
         barCount = 0;
         for (var k in spanHisto[i]) {
             if (display[k]) {
@@ -415,6 +454,7 @@ function plotHistogramData() {
             }
         }
     }
+    histo.append(graph);
     document.body.append(histo)
 }
 

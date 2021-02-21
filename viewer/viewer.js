@@ -374,6 +374,9 @@ function plotHistogramData() {
         }
     }
 
+    // make normal evenly divisible for four grid lines
+    normal = normal + (4 - normal % 4);
+
     var histo = document.getElementById("histo")
     if (histo) {
         histo.remove();
@@ -419,7 +422,8 @@ function plotHistogramData() {
 
         var gridlabel = document.createElementNS("http://www.w3.org/2000/svg", "text");
         gridlabel.innerHTML = (normal * l);
-        gridlabel.setAttribute("x", 0);
+        gridlabel.setAttribute("x", leftInset);
+        gridlabel.setAttribute("text-anchor", "end");
         gridlabel.setAttribute("y", topInset + graphHeight - (l * graphHeight));
         histo.append(gridlabel);
     }

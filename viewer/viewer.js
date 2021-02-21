@@ -19,6 +19,7 @@ function constrainedValue(min, max, clearsConnectivity = true) {
     return function(change = 0) {
         if (change != 0 && clearsConnectivity) {
             connectedSpans = null;
+            spanHisto = null;
         }
 
         currentValue += change
@@ -148,6 +149,7 @@ function attachCheckbox(name) {
     checkbox.addEventListener("change", function() {
         display[name] = checkbox.checked
         connectedSpans = null;
+        spanHisto = null;
         plot()
     })
 }

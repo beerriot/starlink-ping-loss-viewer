@@ -322,7 +322,7 @@ function addToHisto(type, seconds) {
 }
 
 function dropType(sample) {
-    return sample.o ? "o" : (sample.s ? "b" : "s")
+    return !sample.s ? "nosatellite" : (sample.o ? "obstructed" : "betadown")
 }
 
 function plotHistogramData() {
@@ -330,10 +330,10 @@ function plotHistogramData() {
         // 60 second buckets, and 60 minute buckets
         spanHisto = new Array(120);
         
-        // (o)bstructed, (b)eta downtime, no (s)atellite, (c)onnected
+        // important: names must match `display` object fields
         // [instance count, total seconds]
         for (var i = 0; i < spanHisto.length; i++) {
-            spanHisto[i] = {o: [0,0], b: [0,0], s: [0,0], c: [0,0]};
+            spanHisto[i] = {obstructed: [0,0], betadown: [0,0], nosatellite: [0,0], connected: [0,0]};
         }
 
         var minLossRatio = minLossRatioV()
@@ -344,32 +344,42 @@ function plotHistogramData() {
         for (var i = 0; i < data.length; i++) {
             if (!shouldShowDropAt(i, minLossRatio)) {
                 if (dLength > 0) {
-                    addToHisto(dropType(data[i]), dLength);
+                    if (display[dType]) {
+                        addToHisto(dType, dLength);
+                    }
                     dType = null;
                     dLength = 0;
                 }
                 runLength += 1;
             } else {
                 if (runLength > 0) {
-                    addToHisto("c", runLength);
-                    runLength = 0;
-                } else {
-                    var newDType = dropType(data[i]);
-                    if (dType == null) {
-                        dType = newDType;
-                    } else if (dType != newDType) {
-                        addToHisto(dType, dLength);
-                        dType = newDType;
-                        dLength = 0;
+                    if (display.connected) {
+                        addToHisto("connected", runLength);
                     }
+                    runLength = 0;
+                }
+
+                var newDType = dropType(data[i]);
+                if (dType == null) {
+                    dType = newDType;
+                } else if (dType != newDType) {
+                    if (display[dType]) {
+                        addToHisto(dType, dLength);
+                    }
+                    dType = newDType;
+                    dLength = 0;
                 }
                 dLength += 1;
             }
         }
         if (runLength > 0) {
-            addToHisto("c", runLength);
+            if (display.connected) {
+                addToHisto("connected", runLength);
+            }
         } else if (dLength > 0) {
-            addToHisto(dType, dLength);
+            if (display[dType]) {
+                addToHisto(dType, dLength);
+            }
         }
     }
 
@@ -412,22 +422,20 @@ function plotHistogramData() {
         histo.append(bar);
     }
 
+    var colors = {
+        obstructed: "#ff0000",
+        betadown: "#0000ff",
+        nosatellite: "#00ff00",
+        connected: "#ffee00"
+    };
+
     for (var i = 0; i < spanHisto.length; i++) {
         barCount = 0;
-        if (display.obstructed) {
-            addBar((i * plotCount) + barCount, spanHisto[i].o[0], "#ff0000");
-            barCount += 1;
-        }
-        if (display.betadown) {
-            addBar((i * plotCount) + barCount, spanHisto[i].b[0], "#0000ff");
-            barCount += 1;
-        }
-        if (display.nosatellites) {
-            addBar((i * plotCount) + barCount, spanHisto[i].s[0], "#00ff00");
-            barCount += 1;
-        }
-        if (display.connected) {
-            addBar((i * plotCount) + barCount, spanHisto[i].c[0], "#ffee00");
+        for (var k in spanHisto[i]) {
+            if (display[k]) {
+                addBar((i * plotCount) + barCount, spanHisto[i][k][0], colors[k]);
+                barCount += 1;
+            }
         }
     }
     document.body.append(histo)

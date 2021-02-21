@@ -14,8 +14,8 @@ var spanHisto = null;
 // without modification.
 function constrainedValue(min, max, clearsConnectivity = true) {
     var currentValue =
-        Math.min(max || Number.MAX_SAFE_INTEGER,
-                 Math.max(min || 0, Number.MIN_SAFE_INTEGER))
+        Math.min(max != null ? max : Number.MAX_SAFE_INTEGER,
+                 Math.max(min != null ? min : Number.MIN_SAFE_INTEGER))
     return function(change = 0) {
         if (change != 0 && clearsConnectivity) {
             connectedSpans = null;
@@ -23,10 +23,10 @@ function constrainedValue(min, max, clearsConnectivity = true) {
         }
 
         currentValue += change
-        if (min) {
+        if (min != null) {
             currentValue = Math.max(currentValue, min);
         }
-        if (max) {
+        if (max != null) {
             currentValue = Math.min(currentValue, max);
         }
         return currentValue;
@@ -37,9 +37,8 @@ function constrainedValue(min, max, clearsConnectivity = true) {
 var stripeLengthV = constrainedValue(0, null, false);
 stripeLengthV(600);
 
-// Which sample to start the plot with.
+// Which sample to start the plot with. (init == 0)
 var offsetV = constrainedValue(0, null, false);
-offsetV(0);
 
 // Size of a rendered sample.
 var boxWidthV = constrainedValue(1, null, false);
@@ -68,9 +67,8 @@ var colors = {
 var minLossRatioV = constrainedValue(0, 1);
 minLossRatioV(1);
 
-// Largest data[i].n to render.
+// Largest data[i].n to render. (init == 0)
 var maxSnrV = constrainedValue(0, 9);
-maxSnrV(-9); // == 9 - 9 == 0
 
 // What constitues a connected region.
 var connectedMinSecV = constrainedValue(1);

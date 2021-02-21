@@ -56,6 +56,14 @@ var display = {
     "connected": false
 };
 
+var colors = {
+    obstructed: "#ff0000",
+    betadown: "#0000ff",
+    nosatellite: "#00ff00",
+    snr: "#999999",
+    connected: "#ffee00"
+};
+
 // Smallest data[i].d to render.
 var minLossRatioV = constrainedValue(0, 1);
 minLossRatioV(1);
@@ -239,30 +247,19 @@ function plotTimeseriesData() {
         var boxX = ((i-offset) % stripeLength) * boxWidth
         var boxY = Math.floor((i-offset) / stripeLength) * boxHeight
         if (display["snr"] && data[i].n <= maxSnr) {
-            viewer.append(makeBox(boxWidth, boxHeight, boxX, boxY, "#999999", 1-(data[i].n/9)));
+            viewer.append(makeBox(boxWidth, boxHeight, boxX, boxY, colors.snr, 1-(data[i].n/9)));
         }
         if (display["connected"]) {
             for (var j = 0; j < connectedSpans.length; j++) {
                 if (i >= connectedSpans[j].start && i < connectedSpans[j].end) {
-                    viewer.append(makeBox(boxWidth, boxHeight, boxX, boxY, "#ffee00", 1));
+                    viewer.append(makeBox(boxWidth, boxHeight, boxX, boxY, colors.connected, 1));
                     break;
                 }
             }
         }
         if (shouldShowDropAt(i, minLossRatio)) {
-            var color = "#cc00ff"
-            if (!data[i].s && display["nosatellite"]) {
-                color = "#00ff00"
-            } else if (!data[i].o && data[i].s && display["betadown"]) {
-                // beta downtime
-                color = "#0000ff"
-            } else if (data[i].o && display["obstructed"]) {
-                // obstruction
-                color = "#ff0000"
-            }
-            
             var opacity = data[i].d
-            viewer.append(makeBox(boxWidth, boxHeight, boxX, boxY, color, opacity))
+            viewer.append(makeBox(boxWidth, boxHeight, boxX, boxY, colors[dropType(data[i])], opacity))
         }
     }
 
@@ -421,13 +418,6 @@ function plotHistogramData() {
         bar.setAttribute("fill", color);
         histo.append(bar);
     }
-
-    var colors = {
-        obstructed: "#ff0000",
-        betadown: "#0000ff",
-        nosatellite: "#00ff00",
-        connected: "#ffee00"
-    };
 
     for (var i = 0; i < spanHisto.length; i++) {
         barCount = 0;

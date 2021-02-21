@@ -2,8 +2,10 @@
 var data = []
 // Datetime of earliest sample.
 var startdate = null;
-// Computed by analyzing `data` at plot time.
+// Spans of uninterrupted connectivity. Computed by analyzing `data` at plot time.
 var connectedSpans = null;
+// Histogram of span lengths. Computed by analyzing `data` at plot time.
+var spanHisto = null;
 
 // Rendering parameters are functions with captured values. The
 // function alters the captured value by the passed amount, and
@@ -174,6 +176,11 @@ function shouldShowDropAt(index, minLossRatio) {
 }
 
 function plot() {
+    plotTimeseriesData()
+    plotHistogramData()
+}
+
+function plotTimeseriesData() {
     var viewer = document.getElementById("viewer")
     if (viewer) {
         viewer.remove();
@@ -303,6 +310,118 @@ function loadData() {
     } else {
         console.log("Received non-200 status: "+this.status);
     }
+}
+
+function addToHisto(type, seconds) {
+    var b = Math.min(spanHisto.length-1,
+                     seconds < 60 ? seconds : 60 + Math.floor(seconds / 60));
+    spanHisto[b][type][0] += 1;
+    spanHisto[b][type][1] += seconds;
+}
+
+function dropType(sample) {
+    return sample.o ? "o" : (sample.s ? "b" : "s")
+}
+
+function plotHistogramData() {
+    if (spanHisto == null) {
+        // 60 second buckets, and 60 minute buckets
+        spanHisto = new Array(120);
+        
+        // (o)bstructed, (b)eta downtime, no (s)atellite, (c)onnected
+        // [instance count, total seconds]
+        for (var i = 0; i < spanHisto.length; i++) {
+            spanHisto[i] = {o: [0,0], b: [0,0], s: [0,0], c: [0,0]};
+        }
+
+        var minLossRatio = minLossRatioV()
+        
+        var runLength = 0;
+        var dLength = 0;
+        var dType = null;
+        for (var i = 0; i < data.length; i++) {
+            if (!shouldShowDropAt(i, minLossRatio)) {
+                if (dLength > 0) {
+                    addToHisto(dropType(data[i]), dLength);
+                    dType = null;
+                    dLength = 0;
+                }
+                runLength += 1;
+            } else {
+                if (runLength > 0) {
+                    addToHisto("c", runLength);
+                    runLength = 0;
+                } else {
+                    var newDType = dropType(data[i]);
+                    if (dType == null) {
+                        dType = newDType;
+                    } else if (dType != newDType) {
+                        addToHisto(dType, dLength);
+                        dType = newDType;
+                        dLength = 0;
+                    }
+                }
+                dLength += 1;
+            }
+        }
+        if (runLength > 0) {
+            addToHisto("c", runLength);
+        } else if (dLength > 0) {
+            addToHisto(dType, dLength);
+        }
+    }
+
+    var histo = document.getElementById("histo")
+    if (histo) {
+        histo.remove();
+    }
+
+    var plotCount = (display.obstructed ? 1 : 0) +
+        (display.betadown ? 1 : 0) +
+        (display.nosatellite ? 1 : 0) +
+        (display.connected ? 1 : 0);
+
+    histo = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    histo.setAttribute("id", "histo");
+    var barWidth = 2;
+    var svgWidth = spanHisto.length * barWidth * plotCount;
+    var svgHeight = 200;
+    histo.setAttribute("width", svgWidth);
+    histo.setAttribute("height", svgHeight);
+
+    var addBar = function(index, value, color) {
+        var x = index * barWidth;
+        var y = svgHeight - value;
+        var height = value;
+
+        var bar = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+        bar.setAttribute("x", x);
+        bar.setAttribute("width", barWidth);
+        bar.setAttribute("y", y);
+        bar.setAttribute("height", height);
+        bar.setAttribute("fill", color);
+        histo.append(bar);
+    }
+
+    for (var i = 0; i < spanHisto.length; i++) {
+        barCount = 0;
+        if (display.obstructed) {
+            addBar((i * plotCount) + barCount, spanHisto[i].o[0], "#ff0000");
+            barCount += 1;
+        }
+        if (display.betadown) {
+            addBar((i * plotCount) + barCount, spanHisto[i].b[0], "#0000ff");
+            barCount += 1;
+        }
+        if (display.nosatellites) {
+            addBar((i * plotCount) + barCount, spanHisto[i].s[0], "#00ff00");
+            barCount += 1;
+        }
+        if (display.connected) {
+            addBar((i * plotCount) + barCount, spanHisto[i].c[0], "#ffee00");
+        }
+    }
+    document.body.append(histo)
 }
 
 var dataReq = new XMLHttpRequest();

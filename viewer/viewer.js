@@ -176,11 +176,12 @@ function makeBox(width, height, x, y, color, opacity) {
     return box
 }
 
+function dropType(sample) {
+    return !sample.s ? "nosatellite" : (sample.o ? "obstructed" : "betadown")
+}
+
 function shouldShowDropAt(index, minLossRatio) {
-    return ((display["obstructed"] && data[index].o) ||
-            (display["nosatellite"] && !data[index].s) ||
-            (display["betadown"] && data[index].s && !data[index].o)) &&
-        (data[index].d >= minLossRatio);
+    return display[dropType(data[index])] && (data[index].d >= minLossRatio);
 }
 
 function plot() {
@@ -310,14 +311,12 @@ function loadData() {
 }
 
 function addToHisto(type, seconds) {
-    var b = Math.min(spanHisto.length-1,
-                     seconds < 60 ? seconds : 60 + Math.floor(seconds / 60));
-    spanHisto[b][type][0] += 1;
-    spanHisto[b][type][1] += seconds;
-}
-
-function dropType(sample) {
-    return !sample.s ? "nosatellite" : (sample.o ? "obstructed" : "betadown")
+    if (display[type]) {
+        var b = Math.min(spanHisto.length-1,
+                         seconds < 60 ? seconds : 60 + Math.floor(seconds / 60));
+        spanHisto[b][type][0] += 1;
+        spanHisto[b][type][1] += seconds;
+    }
 }
 
 function plotHistogramData() {
@@ -339,18 +338,14 @@ function plotHistogramData() {
         for (var i = 0; i < data.length; i++) {
             if (!shouldShowDropAt(i, minLossRatio)) {
                 if (dLength > 0) {
-                    if (display[dType]) {
-                        addToHisto(dType, dLength);
-                    }
+                    addToHisto(dType, dLength);
                     dType = null;
                     dLength = 0;
                 }
                 runLength += 1;
             } else {
                 if (runLength > 0) {
-                    if (display.connected) {
-                        addToHisto("connected", runLength);
-                    }
+                    addToHisto("connected", runLength);
                     runLength = 0;
                 }
 
@@ -358,9 +353,7 @@ function plotHistogramData() {
                 if (dType == null) {
                     dType = newDType;
                 } else if (dType != newDType) {
-                    if (display[dType]) {
-                        addToHisto(dType, dLength);
-                    }
+                    addToHisto(dType, dLength);
                     dType = newDType;
                     dLength = 0;
                 }
@@ -368,13 +361,9 @@ function plotHistogramData() {
             }
         }
         if (runLength > 0) {
-            if (display.connected) {
-                addToHisto("connected", runLength);
-            }
+            addToHisto("connected", runLength);
         } else if (dLength > 0) {
-            if (display[dType]) {
-                addToHisto(dType, dLength);
-            }
+            addToHisto(dType, dLength);
         }
     }
 

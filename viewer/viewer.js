@@ -430,7 +430,7 @@ function plotHistogramData() {
 
     var addBar = function(index, value, color) {
         var x = index * barWidth;
-        var height = svgHeight * (value / normal);
+        var height = graphHeight * (value / normal);
 
         var bar = document.createElementNS("http://www.w3.org/2000/svg", "rect");
         bar.setAttribute("x", x);

@@ -185,8 +185,94 @@ function shouldShowDropAt(index, minLossRatio) {
 }
 
 function plot() {
+    analyzeData()
     plotTimeseriesData()
     plotHistogramData()
+}
+
+function analyzeData() {
+    if (connectedSpans != null && spanHisto != null) {
+        // don't redo this work if we don't expect it to change
+        return;
+    }
+
+    connectedSpans = [];
+
+    // 59 second buckets, and 60 minute buckets
+    spanHisto = new Array(119);
+
+    // important: names must match `display` object fields
+    // [instance count, total seconds]
+    for (var i = 0; i < spanHisto.length; i++) {
+        spanHisto[i] = {
+            obstructed: [0,0],
+            betadown: [0,0],
+            nosatellite: [0,0],
+            connected: [0,0]
+        };
+    }
+
+    // Memoization so we don't have to keep calling these in the loop.
+    var connectedMinSec = connectedMinSecV();
+    var connectedMaxDSec = connectedMaxDSecV();
+    var minLossRatio = minLossRatioV();
+
+    // Number of consecutive non-outage seconds up to i
+    var connectedLength = 0;
+
+    // Number of consecutive outage seconds (any type) up to i
+    var totalDLength = 0;
+
+    // Number of consecutive outage seconds of the same type up to i
+    var dLength = 0;
+
+    // Type of the outage at i (but mostly referenced before update, so i-1)
+    var dType = null;
+
+    for (var i = 0; i < data.length; i++) {
+        if (!shouldShowDropAt(i, minLossRatio)) {
+            if (dLength > 0) {
+                addToHisto(dType, dLength);
+                dType = null;
+                dLength = 0;
+            }
+            totalDLength = 0;
+            connectedLength += 1;
+        } else {
+            totalDLength += 1;
+            if (totalDLength > connectedMaxDSec) {
+                if (connectedLength > 0) {
+                    addToHisto("connected", connectedLength);
+                }
+                if (connectedLength >= connectedMinSec) {
+                    connectedSpans.push({"start":i-connectedLength, "end":i});
+                }
+                connectedLength = 0;
+            } else {
+                connectedLength += 1;
+            }
+
+            var newDType = dropType(data[i]);
+            if (dType == null) {
+                dType = newDType;
+            } else if (dType != newDType) {
+                addToHisto(dType, dLength);
+                dType = newDType;
+                dLength = 0;
+            }
+            dLength += 1;
+        }
+    }
+
+    if (connectedLength > 0) {
+        addToHisto("connected", connectedLength);
+        if (connectedLength >= connectedMinSec) {
+            connectedSpans.push({"start":data.length-connectedLength,
+                                 "end":data.length});
+        }
+    } else if (dLength > 0) {
+        addToHisto(dType, dLength);
+    }
 }
 
 function plotTimeseriesData() {
@@ -205,34 +291,7 @@ function plotTimeseriesData() {
     var maxSnr = maxSnrV();
 
     if (display["connected"] && connectedSpans == null) {
-        connectedSpans = [];
-
-        // More memoization, but these should only be needed during
-        // this recalculation.
-        var connectedMinSec = connectedMinSecV();
-        var connectedMaxDSec = connectedMaxDSecV();
-
-        var runLength = 0;
-        var dLength = 0;
-        for (var i = 0; i < data.length; i++) {
-            if (!shouldShowDropAt(i, minLossRatio)) {
-                dLength = 0;
-                runLength += 1;
-            } else {
-                dLength += 1;
-                if (dLength > connectedMaxDSec) {
-                    if (runLength >= connectedMinSec) {
-                        connectedSpans.push({"start":i-runLength, "end":i});
-                    }
-                    runLength = 0;
-                } else {
-                    runLength += 1;
-                }
-            }
-        }
-        if (runLength >= connectedMinSec) {
-            connectedSpans.push({"start":data.length-runLength, "end":data.length});
-        }
+        console.log("No connected span data to plot!");
     }
     
     viewer = document.createElementNS("http://www.w3.org/2000/svg", "svg")
@@ -321,50 +380,8 @@ function addToHisto(type, seconds) {
 
 function plotHistogramData() {
     if (spanHisto == null) {
-        // 59 second buckets, and 60 minute buckets
-        spanHisto = new Array(119);
-        
-        // important: names must match `display` object fields
-        // [instance count, total seconds]
-        for (var i = 0; i < spanHisto.length; i++) {
-            spanHisto[i] = {obstructed: [0,0], betadown: [0,0], nosatellite: [0,0], connected: [0,0]};
-        }
-
-        var minLossRatio = minLossRatioV()
-        
-        var runLength = 0;
-        var dLength = 0;
-        var dType = null;
-        for (var i = 0; i < data.length; i++) {
-            if (!shouldShowDropAt(i, minLossRatio)) {
-                if (dLength > 0) {
-                    addToHisto(dType, dLength);
-                    dType = null;
-                    dLength = 0;
-                }
-                runLength += 1;
-            } else {
-                if (runLength > 0) {
-                    addToHisto("connected", runLength);
-                    runLength = 0;
-                }
-
-                var newDType = dropType(data[i]);
-                if (dType == null) {
-                    dType = newDType;
-                } else if (dType != newDType) {
-                    addToHisto(dType, dLength);
-                    dType = newDType;
-                    dLength = 0;
-                }
-                dLength += 1;
-            }
-        }
-        if (runLength > 0) {
-            addToHisto("connected", runLength);
-        } else if (dLength > 0) {
-            addToHisto(dType, dLength);
-        }
+        console.log("No histogram to plot!");
+        return;
     }
 
     var normal = 0;

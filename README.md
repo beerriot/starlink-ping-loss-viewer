@@ -167,6 +167,32 @@ If you place your mouse over the rendering, a tooltip will display the
 offset into the data array, as well as the date and time of that
 sample, at the position of your pointer.
 
+A histogram is rendered below the timeseries chart. This histogram
+shows the count of the number of times a span of each type, for the
+given duration, was observed. Colors are the same as the timeseries
+graph. Example: If a red bar of height 10 at the "1s" mark is
+displayed, that means that a one-second obstruction was observed 10
+times in the data. A blue bar of height 1 at the "10m" mark is
+displayed, one ten-minute-long beta downtime was observed.
+
+The histogram obeys the same filtering rules as the timeseries data,
+except instea of shading, any sample that would have been rendered is
+added to any span to which it is adjacent. That is, if "min loss
+ratio" is set to 0.5, and over three seconds an obstruction causes
+ping losses of 0.75, 1, and 0.9, a three-second obstruction span will
+be recorded.
+
+Connection spans also obey the same filtering rules as the timeseries
+data. If "Max Down Sec" is set to 2, then outages (of any type,
+including mixed-cause) lasting two seconds or less will not interrupt
+a connection. For example, two 5-second spans of connectivity
+interrupted by a 1-second span of beta downtime will be recorded as
+one 11-second span of connectivity (5 + 5 + 1). The one-second beta
+downtime will also be counted, since that area of the graph can be
+ignored without affecting other data. "Min Clear Sec" is ignored for
+the purposes of the histogram, since recording smaller spans here does
+not prevent charting longer spans.
+
 ## Results
 
 The idea behind the viewer is that the beam between the dish and the

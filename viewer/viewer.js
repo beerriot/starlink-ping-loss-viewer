@@ -526,11 +526,11 @@ function plotHistogramData() {
     histo = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     histo.setAttribute("id", "histo");
 
-    // 12 because there are 4 categories, and 12 is evenly divisible
-    // by any selection of that.
-    var bucketWidth = 12;
+    // 10 * 120 buckets = about my screen width
+    var bucketWidth = 10;
     var graphWidth = bucketWidth * spanHisto.length;
-    var barWidth = bucketWidth/plotCount;
+    // bucketWidth-1 ensures a space between buckets
+    var barWidth = (bucketWidth-1)/plotCount;
     var graphHeight = 200;
 
     var leftInset = 60;
@@ -588,8 +588,8 @@ function plotHistogramData() {
         histo.append(gridlabel);
     }
 
-    var addBar = function(index, value, color) {
-        var x = index * barWidth;
+    var addBar = function(bucketIndex, typeIndex, value, color) {
+        var x = bucketIndex * bucketWidth + typeIndex * barWidth;
         var height = graphHeight * (value / normal);
 
         var bar = document.createElementNS("http://www.w3.org/2000/svg", "rect");
@@ -604,12 +604,13 @@ function plotHistogramData() {
     var addXTick = function(i, label) {
         var gridArrow = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
         var basex = leftInset + i * bucketWidth;
+        var arrowWidth = plotCount * barWidth;
         var basey = topInset + graphHeight;
         var arrowHeight = bucketWidth / 2
         gridArrow.setAttribute("points",
                                basex+","+basey+" "+
-                               (basex+bucketWidth)+","+basey+" "+
-                               (basex+bucketWidth/2)+","+(basey+arrowHeight));
+                               (basex+arrowWidth)+","+basey+" "+
+                               (basex+arrowWidth/2)+","+(basey+arrowHeight));
         gridArrow.setAttribute("fill", "#eeeeee");
         histo.append(gridArrow);
 
@@ -637,7 +638,7 @@ function plotHistogramData() {
         barCount = 0;
         for (var k in spanHisto[i]) {
             if (display[k]) {
-                addBar((i * plotCount) + barCount, spanHisto[i][k][0], colors[k]);
+                addBar(i, barCount, spanHisto[i][k][0], colors[k]);
                 barCount += 1;
             }
         }

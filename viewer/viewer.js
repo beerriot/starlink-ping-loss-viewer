@@ -76,7 +76,7 @@ connectedMinSecV(1799); // == 1 + 1799 == 1800
 var connectedMaxDSecV = constrainedValue(0);
 connectedMaxDSecV(2);
 
-function attachButtons(prefix, value, textInput) {
+function attachButtons(prefix, value, textInput, replot = plot) {
     var buttons = {
         "minus30": -30,
         "minus10": -10,
@@ -89,7 +89,7 @@ function attachButtons(prefix, value, textInput) {
         return function() {
             var newVal = value(change);
             textInput.value = newVal;
-            plot();
+            replot();
         }
     };
     for (var key in buttons) {
@@ -110,7 +110,7 @@ function inputChangeThunk(input, setter, parser = parseInt) {
     }
 }
 
-function attachInput(name, value, parser = parseInt) {
+function attachInput(name, value, parser = parseInt, replot = plot) {
     var input = document.getElementById(name);
 
     // Display the initial value
@@ -123,7 +123,7 @@ function attachInput(name, value, parser = parseInt) {
             // compute the delta between its current value and the new
             // value, and send that as the change.
             input.value = value(newVal + (-1 * value()));
-            plot();
+            replot();
         } else {
             // If the input was invalid, replace it with what is
             // already stored. No need to re-render.
@@ -139,9 +139,9 @@ attachButtons("stripeLength", stripeLengthV,
 attachButtons("offset", offsetV,
               attachInput("offset", offsetV));
 attachButtons("boxWidth", boxWidthV,
-              attachInput("boxWidth", boxWidthV));
+              attachInput("boxWidth", boxWidthV, parseInt, rescale), rescale);
 attachButtons("boxHeight", boxHeightV,
-              attachInput("boxHeight", boxHeightV));
+              attachInput("boxHeight", boxHeightV, parseInt, rescale), rescale);
 attachInput("minLossRatio", minLossRatioV, parseFloat);
 attachInput("maxSnr", maxSnrV, parseFloat);
 attachInput("connectedMinSec", connectedMinSecV);
@@ -224,6 +224,14 @@ function dropType(sample) {
 
 function shouldShowDropAt(index, minLossRatio) {
     return display[dropType(data[index])] && (data[index].d >= minLossRatio);
+}
+
+function rescale() {
+    var viewer = document.getElementById("viewer");
+    viewer.setAttribute("width", boxWidthV()*stripeLengthV());
+    viewer.setAttribute("height", boxHeightV()*Math.ceil(data.length/stripeLengthV()));
+    var spanGroup = viewer.getElementById("spans");
+    spanGroup.setAttribute("transform", "scale("+boxWidthV()+","+boxHeightV()+")");
 }
 
 function plot() {
@@ -340,6 +348,7 @@ function plotTimeseriesData() {
     viewer.setAttribute("height", height)
 
     var spanGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    spanGroup.setAttribute("id", "spans");
     spanGroup.setAttribute("transform", "scale("+boxWidth+","+boxHeight+")");
     viewer.append(spanGroup);
 

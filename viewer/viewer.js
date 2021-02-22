@@ -364,12 +364,36 @@ function plotTimeseriesData() {
     var dLevel = null;
     var dLength = 0;
 
+    // accumulators for snr
+    var snrLevel = null;
+    var snrLength = 0;
+
     for (var i = offset; i < data.length; i++) {
         var boxX = ((i-offset) % stripeLength) * boxWidth
         var boxY = Math.floor((i-offset) / stripeLength) * boxHeight
+
         if (display["snr"] && data[i].n <= maxSnr) {
-            viewer.append(makeBox(boxWidth, boxHeight, boxX, boxY, colors.snr, 1-(data[i].n/9)));
+            if (data[i].n != snrLevel) {
+                // snr span ended in a different snr level
+                if (snrLevel != null) {
+                    appendSpans(makeSpans(boxWidth, boxHeight, stripeLength,
+                                          i-snrLength, i,
+                                          colors.snr, 1-(snrLevel/9)));
+                }
+                snrLevel = data[i].n;
+                snrLength = 1;
+            } else {
+                snrLength += 1;
+            }
+        } else if (snrLevel != null) {
+            // snr span ended in no snr plot
+            appendSpans(makeSpans(boxWidth, boxHeight, stripeLength,
+                                  i-snrLength, i,
+                                  colors.snr, 1-(snrLevel/9)));
+            snrLevel = null;
+            snrLength = 0;
         }
+
         if (shouldShowDropAt(i, minLossRatio)) {
             var newDType = dropType(data[i]);
             if (newDType != dType || data[i].d != dLevel) {
@@ -394,6 +418,20 @@ function plotTimeseriesData() {
             dLevel = null;
             dLength = 0;
         }
+    }
+
+    if (snrLevel != null) {
+        // graph ended with an snr span
+        appendSpans(makeSpans(boxWidth, boxHeight, stripeLength,
+                              data.length-snrLength, data.length,
+                              colors.snr, 1-(snrLevel/9)));
+    }
+
+    if (dType != null) {
+        // graph ended with an outage
+        appendSpans(makeSpans(boxWidth, boxHeight, stripeLength,
+                              data.length-dLength, data.length,
+                              colors[dType], dLevel));
     }
 
     var tooltip = document.createElementNS("http://www.w3.org/2000/svg", "g");

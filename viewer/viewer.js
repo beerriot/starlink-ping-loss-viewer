@@ -176,12 +176,11 @@ function makeBox(width, height, x, y, color, opacity) {
     return box
 }
 
-function makeSpans(boxWidth, boxHeight, stripeLength, start, end, color, opacity) {
+function makeSpans(stripeLength, start, end, color, opacity) {
     if (end-start == 1) {
         // Auto-handling 1-second "spans" makes the rest of the code simpler.
-        return [makeBox(boxWidth, boxHeight,
-                        (start % stripeLength) * boxWidth,
-                        Math.floor(start / stripeLength) * boxHeight,
+        return [makeBox(1, 1, (start % stripeLength),
+                        Math.floor(start / stripeLength),
                         color, opacity)];
     }
 
@@ -193,27 +192,27 @@ function makeSpans(boxWidth, boxHeight, stripeLength, start, end, color, opacity
 
     if (start < nextEdge) {
         // Span does not begin at graph edge. Draw partial row.
-        var width = (Math.min(nextEdge, end) - start) * boxWidth;
-        var boxX = (start % stripeLength) * boxWidth
-        var boxY = Math.floor(start / stripeLength) * boxHeight;
-        spans.push(makeBox(width, boxHeight, boxX, boxY, color, opacity));
+        var width = (Math.min(nextEdge, end) - start);
+        var boxX = (start % stripeLength)
+        var boxY = Math.floor(start / stripeLength);
+        spans.push(makeBox(width, 1, boxX, boxY, color, opacity));
     }
 
     if (nextEdge < prevEdge) {
         // There is a segment of the span that wraps edge to edge.
-        var width = stripeLength * boxWidth;
-        var height = ((prevEdge - nextEdge) / stripeLength) * boxHeight;
+        var width = stripeLength;
+        var height = ((prevEdge - nextEdge) / stripeLength);
         var boxX = 0;
-        var boxY = Math.floor(nextEdge / stripeLength) * boxHeight;
+        var boxY = Math.floor(nextEdge / stripeLength);
         spans.push(makeBox(width, height, boxX, boxY, color, opacity));
     }
 
     if (prevEdge < end && prevEdge > start) {
         // Span does not end at graph edge. Draw partial row.
-        var width = (end - prevEdge) * boxWidth;
+        var width = (end - prevEdge);
         var boxX = 0;
-        var boxY = Math.floor(prevEdge / stripeLength) * boxHeight;
-        spans.push(makeBox(width, boxHeight, boxX, boxY, color, opacity));
+        var boxY = Math.floor(prevEdge / stripeLength);
+        spans.push(makeBox(width, 1, boxX, boxY, color, opacity));
     }
 
     return spans;
@@ -340,9 +339,13 @@ function plotTimeseriesData() {
     var height = Math.ceil(data.length / stripeLength) * boxHeight
     viewer.setAttribute("height", height)
 
+    var spanGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    spanGroup.setAttribute("transform", "scale("+boxWidth+","+boxHeight+")");
+    viewer.append(spanGroup);
+
     var appendSpans = function(spans) {
         for (var j = 0; j < spans.length; j++) {
-            viewer.append(spans[j]);
+            spanGroup.append(spans[j]);
         }
     };
 
@@ -351,7 +354,7 @@ function plotTimeseriesData() {
             console.log("No connected span data to plot!");
         } else {
             for (var i = 0; i < connectedSpans.length; i++) {
-                appendSpans(makeSpans(boxWidth, boxHeight, stripeLength,
+                appendSpans(makeSpans(stripeLength,
                                       connectedSpans[i].start-offset,
                                       connectedSpans[i].end-offset,
                                       colors.connected, 1));
@@ -369,14 +372,11 @@ function plotTimeseriesData() {
     var snrLength = 0;
 
     for (var i = offset; i < data.length; i++) {
-        var boxX = ((i-offset) % stripeLength) * boxWidth
-        var boxY = Math.floor((i-offset) / stripeLength) * boxHeight
-
         if (display["snr"] && data[i].n <= maxSnr) {
             if (data[i].n != snrLevel) {
                 // snr span ended in a different snr level
                 if (snrLevel != null) {
-                    appendSpans(makeSpans(boxWidth, boxHeight, stripeLength,
+                    appendSpans(makeSpans(stripeLength,
                                           i-snrLength, i,
                                           colors.snr, 1-(snrLevel/9)));
                 }
@@ -387,7 +387,7 @@ function plotTimeseriesData() {
             }
         } else if (snrLevel != null) {
             // snr span ended in no snr plot
-            appendSpans(makeSpans(boxWidth, boxHeight, stripeLength,
+            appendSpans(makeSpans(stripeLength,
                                   i-snrLength, i,
                                   colors.snr, 1-(snrLevel/9)));
             snrLevel = null;
@@ -399,7 +399,7 @@ function plotTimeseriesData() {
             if (newDType != dType || data[i].d != dLevel) {
                 // drop span ended in a new drop span
                 if (dType != null) {
-                    appendSpans(makeSpans(boxWidth, boxHeight, stripeLength,
+                    appendSpans(makeSpans(stripeLength,
                                           i-dLength, i,
                                           colors[dType], dLevel));
                 }
@@ -411,7 +411,7 @@ function plotTimeseriesData() {
             }
         } else if (dType != null) {
             // drop span ended in a non-drop span
-            appendSpans(makeSpans(boxWidth, boxHeight, stripeLength,
+            appendSpans(makeSpans(stripeLength,
                                   i-dLength, i,
                                   colors[dType], dLevel));
             dType = null;
@@ -422,14 +422,14 @@ function plotTimeseriesData() {
 
     if (snrLevel != null) {
         // graph ended with an snr span
-        appendSpans(makeSpans(boxWidth, boxHeight, stripeLength,
+        appendSpans(makeSpans(stripeLength,
                               data.length-snrLength, data.length,
                               colors.snr, 1-(snrLevel/9)));
     }
 
     if (dType != null) {
         // graph ended with an outage
-        appendSpans(makeSpans(boxWidth, boxHeight, stripeLength,
+        appendSpans(makeSpans(stripeLength,
                               data.length-dLength, data.length,
                               colors[dType], dLevel));
     }

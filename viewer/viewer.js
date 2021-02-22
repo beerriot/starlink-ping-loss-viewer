@@ -290,10 +290,6 @@ function plotTimeseriesData() {
     var minLossRatio = minLossRatioV();
     var maxSnr = maxSnrV();
 
-    if (display["connected"] && connectedSpans == null) {
-        console.log("No connected span data to plot!");
-    }
-    
     viewer = document.createElementNS("http://www.w3.org/2000/svg", "svg")
     viewer.setAttribute("id", "viewer")
     var width = stripeLength * boxWidth;
@@ -301,19 +297,50 @@ function plotTimeseriesData() {
     var height = Math.ceil(data.length / stripeLength) * boxHeight
     viewer.setAttribute("height", height)
 
+    if (display["connected"]) {
+        if (connectedSpans == null) {
+            console.log("No connected span data to plot!");
+        } else {
+            for (var i = 0; i < connectedSpans.length; i++) {
+                var start = connectedSpans[i].start - offset;
+                var nextEdge = (start % stripeLength == 0) ? start :
+                    start + stripeLength - (start % stripeLength);
+                var end = connectedSpans[i].end - offset;
+                var prevEdge = end - (end % stripeLength)
+
+                if (start < nextEdge) {
+                    // Span does not begin at graph edge. Draw partial row.
+                    var width = (Math.min(nextEdge, end) - start) * boxWidth;
+                    var boxX = (start % stripeLength) * boxWidth
+                    var boxY = Math.floor(start / stripeLength) * boxHeight;
+                    viewer.append(makeBox(width, boxHeight, boxX, boxY, colors.connected, 1));
+                }
+
+                if (nextEdge < prevEdge) {
+                    // There is a segment of the span that wraps edge to edge.
+                    var width = stripeLength * boxWidth;
+                    var height = ((prevEdge - nextEdge) / stripeLength) * boxHeight;
+                    var boxX = 0;
+                    var boxY = Math.floor(nextEdge / stripeLength) * boxHeight;
+                    viewer.append(makeBox(width, height, boxX, boxY, colors.connected, 1));
+                }
+
+                if (prevEdge < end && prevEdge > start) {
+                    // Span does not end at graph edge. Draw partial row.
+                    var width = (end - prevEdge) * boxWidth;
+                    var boxX = 0;
+                    var boxY = Math.floor(prevEdge / stripeLength) * boxHeight;
+                    viewer.append(makeBox(width, boxHeight, boxX, boxY, colors.connected, 1));
+                }
+            }
+        }
+    }
+
     for (var i = offset; i < data.length; i++) {
         var boxX = ((i-offset) % stripeLength) * boxWidth
         var boxY = Math.floor((i-offset) / stripeLength) * boxHeight
         if (display["snr"] && data[i].n <= maxSnr) {
             viewer.append(makeBox(boxWidth, boxHeight, boxX, boxY, colors.snr, 1-(data[i].n/9)));
-        }
-        if (display["connected"]) {
-            for (var j = 0; j < connectedSpans.length; j++) {
-                if (i >= connectedSpans[j].start && i < connectedSpans[j].end) {
-                    viewer.append(makeBox(boxWidth, boxHeight, boxX, boxY, colors.connected, 1));
-                    break;
-                }
-            }
         }
         if (shouldShowDropAt(i, minLossRatio)) {
             var opacity = data[i].d

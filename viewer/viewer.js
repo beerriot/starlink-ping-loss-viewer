@@ -425,6 +425,10 @@ function plotHistogramData() {
         gridlabel.setAttribute("x", leftInset);
         gridlabel.setAttribute("text-anchor", "end");
         gridlabel.setAttribute("y", topInset + graphHeight - (l * graphHeight));
+        gridlabel.setAttribute("font-family", "Verdana");
+        gridlabel.setAttribute("font-size", "9pt");
+        gridlabel.setAttribute("dy", "3pt");
+        gridlabel.setAttribute("dx", "-2pt");
         histo.append(gridlabel);
     }
 
@@ -443,10 +447,25 @@ function plotHistogramData() {
 
     for (var i = 0; i < spanHisto.length; i++) {
         if (i > 0 && i % 10 == 0) {
+            var gridArrow = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+            var basex = leftInset + i * bucketWidth;
+            var basey = topInset + graphHeight;
+            var arrowHeight = bucketWidth / 2
+            gridArrow.setAttribute("points",
+                                   basex+","+basey+" "+
+                                   (basex+bucketWidth)+","+basey+" "+
+                                   (basex+bucketWidth/2)+","+(basey+arrowHeight));
+            gridArrow.setAttribute("fill", "#eeeeee");
+            histo.append(gridArrow);
+
             var gridlabel = document.createElementNS("http://www.w3.org/2000/svg", "text");
-            gridlabel.innerHTML = i < 60 ? i+"s" : (i-60)+"m";
-            gridlabel.setAttribute("x", i*bucketWidth);
-            gridlabel.setAttribute("y", svgHeight);
+            gridlabel.textContent = i < 60 ? i+"s" : (i-60)+"m";
+            gridlabel.setAttribute("x", leftInset + i * bucketWidth + bucketWidth/2);
+            gridlabel.setAttribute("y", topInset + graphHeight + arrowHeight);
+            gridlabel.setAttribute("font-family", "Verdana");
+            gridlabel.setAttribute("font-size", "9pt");
+            gridlabel.setAttribute("dy", "9pt");
+            gridlabel.setAttribute("text-anchor", "middle")
             histo.append(gridlabel);
         }
 

@@ -411,11 +411,12 @@ function plotHistogramData() {
     // graph into position) to make the bar-creating code simpler.
     graph.setAttribute("transform", "matrix(1, 0, 0, -1, "+leftInset+", "+(graphHeight+topInset)+")");
 
-    for (var l = 0.25; l <= 1; l += 0.25) {
+    for (var l = 0; l <= 1; l += 0.25) {
         var grid = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-        grid.setAttribute("x", 0);
+        var leftHang = 3;
+        grid.setAttribute("x", -leftHang);
         grid.setAttribute("y", l * graphHeight);
-        grid.setAttribute("width", graphWidth);
+        grid.setAttribute("width", leftHang + (l == 0 ? 0 : graphWidth));
         grid.setAttribute("height", 1);
         grid.setAttribute("fill", "#eeeeee");
         graph.append(grid);
@@ -468,6 +469,7 @@ function plotHistogramData() {
         histo.append(gridlabel);
     }
 
+    addXTick(0, "1s");
     for (var i = 0; i < spanHisto.length; i++) {
         if (i > 0 && i < 59 && i % 10 == 9) {
             addXTick(i, (i+1)+"s");

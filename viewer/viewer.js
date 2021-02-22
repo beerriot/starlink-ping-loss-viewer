@@ -180,7 +180,7 @@ function makeSpans(boxWidth, boxHeight, stripeLength, start, end, color, opacity
     if (end-start == 1) {
         // Auto-handling 1-second "spans" makes the rest of the code simpler.
         return [makeBox(boxWidth, boxHeight,
-                        (start * stripeLength) * boxWidth,
+                        (start % stripeLength) * boxWidth,
                         Math.floor(start / stripeLength) * boxHeight,
                         color, opacity)];
     }

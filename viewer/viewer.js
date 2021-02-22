@@ -335,21 +335,19 @@ function plotTimeseriesData() {
     // functions data.length times.
     var stripeLength = stripeLengthV();
     var offset = offsetV();
-    var boxWidth = boxWidthV();
-    var boxHeight = boxHeightV();
     var minLossRatio = minLossRatioV();
     var maxSnr = maxSnrV();
 
     viewer = document.createElementNS("http://www.w3.org/2000/svg", "svg")
     viewer.setAttribute("id", "viewer")
-    var width = stripeLength * boxWidth;
+    var width = stripeLength * boxWidthV();
     viewer.setAttribute("width", width)
-    var height = Math.ceil(data.length / stripeLength) * boxHeight
+    var height = Math.ceil(data.length / stripeLength) * boxHeightV()
     viewer.setAttribute("height", height)
 
     var spanGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
     spanGroup.setAttribute("id", "spans");
-    spanGroup.setAttribute("transform", "scale("+boxWidth+","+boxHeight+")");
+    spanGroup.setAttribute("transform", "scale("+boxWidthV()+","+boxHeightV()+")");
     viewer.append(spanGroup);
 
     var appendSpans = function(spans) {

@@ -397,10 +397,10 @@ function plotHistogramData() {
     var barWidth = bucketWidth/plotCount;
     var graphHeight = 200;
 
-    var leftInset = 30;
+    var leftInset = 60;
     var rightInset = 10;
     var topInset = 10;
-    var bottomInset = 30;
+    var bottomInset = 50;
     var svgWidth = graphWidth + leftInset + rightInset;
     var svgHeight = graphHeight + topInset + bottomInset;
     histo.setAttribute("width", svgWidth);
@@ -410,6 +410,25 @@ function plotHistogramData() {
     // Flip the coordinate system upside down (while also shifting the
     // graph into position) to make the bar-creating code simpler.
     graph.setAttribute("transform", "matrix(1, 0, 0, -1, "+leftInset+", "+(graphHeight+topInset)+")");
+
+    var yAxisLabel = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    yAxisLabel.textContent = "occurrences";
+    yAxisLabel.setAttribute("text-anchor", "middle");
+    yAxisLabel.setAttribute("transform", "rotate(-90)");
+    yAxisLabel.setAttribute("x", -graphHeight/2);
+    yAxisLabel.setAttribute("y", "11pt");
+    yAxisLabel.setAttribute("font-size", "11pt");
+    yAxisLabel.setAttribute("font-family", "Verdana");
+    histo.append(yAxisLabel);
+
+    var xAxisLabel = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    xAxisLabel.textContent = "outage/connection duration";
+    xAxisLabel.setAttribute("text-anchor", "middle");
+    xAxisLabel.setAttribute("x", leftInset + graphWidth / 2);
+    xAxisLabel.setAttribute("y", svgHeight - 5);
+    xAxisLabel.setAttribute("font-size", "11pt");
+    xAxisLabel.setAttribute("font-family", "Verdana");
+    histo.append(xAxisLabel);
 
     for (var l = 0; l <= 1; l += 0.25) {
         var grid = document.createElementNS("http://www.w3.org/2000/svg", "rect");

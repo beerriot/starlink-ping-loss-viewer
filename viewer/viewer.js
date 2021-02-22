@@ -381,12 +381,13 @@ function plotTimeseriesData() {
     var snrLength = 0;
 
     for (var i = offset; i < data.length; i++) {
+        var oi = i-offset;
         if (display["snr"] && data[i].n <= maxSnr) {
             if (data[i].n != snrLevel) {
                 // snr span ended in a different snr level
                 if (snrLevel != null) {
                     appendSpans(makeSpans(stripeLength,
-                                          i-snrLength, i,
+                                          oi-snrLength, oi,
                                           colors.snr, 1-(snrLevel/9)));
                 }
                 snrLevel = data[i].n;
@@ -397,7 +398,7 @@ function plotTimeseriesData() {
         } else if (snrLevel != null) {
             // snr span ended in no snr plot
             appendSpans(makeSpans(stripeLength,
-                                  i-snrLength, i,
+                                  oi-snrLength, oi,
                                   colors.snr, 1-(snrLevel/9)));
             snrLevel = null;
             snrLength = 0;
@@ -409,7 +410,7 @@ function plotTimeseriesData() {
                 // drop span ended in a new drop span
                 if (dType != null) {
                     appendSpans(makeSpans(stripeLength,
-                                          i-dLength, i,
+                                          oi-dLength, oi,
                                           colors[dType], dLevel));
                 }
                 dType = newDType;
@@ -421,7 +422,7 @@ function plotTimeseriesData() {
         } else if (dType != null) {
             // drop span ended in a non-drop span
             appendSpans(makeSpans(stripeLength,
-                                  i-dLength, i,
+                                  oi-dLength, oi,
                                   colors[dType], dLevel));
             dType = null;
             dLevel = null;
@@ -432,14 +433,14 @@ function plotTimeseriesData() {
     if (snrLevel != null) {
         // graph ended with an snr span
         appendSpans(makeSpans(stripeLength,
-                              data.length-snrLength, data.length,
+                              data.length-offset-snrLength, data.length-offset,
                               colors.snr, 1-(snrLevel/9)));
     }
 
     if (dType != null) {
         // graph ended with an outage
         appendSpans(makeSpans(stripeLength,
-                              data.length-dLength, data.length,
+                              data.length-offset-dLength, data.length-offset,
                               colors[dType], dLevel));
     }
 
@@ -465,7 +466,7 @@ function plotTimeseriesData() {
         var svgy = l.offsetY;
         tooltip.setAttribute("transform", "translate("+(svgx+mouseoffsetx)+","+(svgy+mouseoffsety)+")");
 
-        var index = Math.floor(svgy/boxHeight)*stripeLength + Math.floor(svgx/boxWidth)
+        var index = Math.floor(svgy/boxHeight)*stripeLength + Math.floor(svgx/boxWidth) + offset;
         var hereDate = startdate ? new Date(startdate) : ""
         startdate && hereDate.setSeconds(hereDate.getSeconds() + index);
         time.innerHTML = index + " " + hereDate;

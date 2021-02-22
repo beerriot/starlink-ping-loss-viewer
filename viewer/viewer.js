@@ -313,7 +313,7 @@ function loadData() {
 function addToHisto(type, seconds) {
     if (display[type]) {
         var b = Math.min(spanHisto.length-1,
-                         seconds < 60 ? seconds : 60 + Math.floor(seconds / 60));
+                         seconds < 60 ? seconds-1 : 59 + Math.floor(seconds / 60));
         spanHisto[b][type][0] += 1;
         spanHisto[b][type][1] += seconds;
     }
@@ -321,8 +321,8 @@ function addToHisto(type, seconds) {
 
 function plotHistogramData() {
     if (spanHisto == null) {
-        // 60 second buckets, and 60 minute buckets
-        spanHisto = new Array(120);
+        // 59 second buckets, and 60 minute buckets
+        spanHisto = new Array(119);
         
         // important: names must match `display` object fields
         // [instance count, total seconds]
@@ -445,28 +445,36 @@ function plotHistogramData() {
         graph.append(bar);
     }
 
-    for (var i = 0; i < spanHisto.length; i++) {
-        if (i > 0 && i % 10 == 0) {
-            var gridArrow = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
-            var basex = leftInset + i * bucketWidth;
-            var basey = topInset + graphHeight;
-            var arrowHeight = bucketWidth / 2
-            gridArrow.setAttribute("points",
-                                   basex+","+basey+" "+
-                                   (basex+bucketWidth)+","+basey+" "+
-                                   (basex+bucketWidth/2)+","+(basey+arrowHeight));
-            gridArrow.setAttribute("fill", "#eeeeee");
-            histo.append(gridArrow);
+    var addXTick = function(i, label) {
+        var gridArrow = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+        var basex = leftInset + i * bucketWidth;
+        var basey = topInset + graphHeight;
+        var arrowHeight = bucketWidth / 2
+        gridArrow.setAttribute("points",
+                               basex+","+basey+" "+
+                               (basex+bucketWidth)+","+basey+" "+
+                               (basex+bucketWidth/2)+","+(basey+arrowHeight));
+        gridArrow.setAttribute("fill", "#eeeeee");
+        histo.append(gridArrow);
 
-            var gridlabel = document.createElementNS("http://www.w3.org/2000/svg", "text");
-            gridlabel.textContent = i < 60 ? i+"s" : (i-60)+"m";
-            gridlabel.setAttribute("x", leftInset + i * bucketWidth + bucketWidth/2);
-            gridlabel.setAttribute("y", topInset + graphHeight + arrowHeight);
-            gridlabel.setAttribute("font-family", "Verdana");
-            gridlabel.setAttribute("font-size", "9pt");
-            gridlabel.setAttribute("dy", "9pt");
-            gridlabel.setAttribute("text-anchor", "middle")
-            histo.append(gridlabel);
+        var gridlabel = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        gridlabel.textContent = label;
+        gridlabel.setAttribute("x", leftInset + i * bucketWidth + bucketWidth/2);
+        gridlabel.setAttribute("y", topInset + graphHeight + arrowHeight);
+        gridlabel.setAttribute("font-family", "Verdana");
+        gridlabel.setAttribute("font-size", "9pt");
+        gridlabel.setAttribute("dy", "9pt");
+        gridlabel.setAttribute("text-anchor", "middle")
+        histo.append(gridlabel);
+    }
+
+    for (var i = 0; i < spanHisto.length; i++) {
+        if (i > 0 && i < 59 && i % 10 == 9) {
+            addXTick(i, (i+1)+"s");
+        } else if (i == 59) {
+            addXTick(i, "1m");
+        } else if (i > 59 && i % 10 == 8) {
+            addXTick(i, (i-58)+"m");
         }
 
         barCount = 0;

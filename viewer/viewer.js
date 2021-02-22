@@ -34,22 +34,20 @@ function constrainedValue(min, max, clearsConnectivity = true) {
 };
 
 // Samples per row.
-var stripeLengthV = constrainedValue(0, null, false);
-stripeLengthV(600);
+var stripeLengthV = constrainedValue(1, null, false);
+stripeLengthV(1199); // 1 + 1199 == 1200 (20 minutes)
 
 // Which sample to start the plot with. (init == 0)
 var offsetV = constrainedValue(0, null, false);
 
-// Size of a rendered sample.
+// Size of a rendered sample. (default 1x1)
 var boxWidthV = constrainedValue(1, null, false);
-boxWidthV(1); // == 1 + 1 == 2
 var boxHeightV = constrainedValue(1, null, false);
-boxHeightV(1); // == 1 + 1 == 2
 
 // Which items to display.
 var display = {
     "obstructed": true,
-    "betadown": false,
+    "betadown": true,
     "nosatellite": false,
     "snr": false,
     "connected": false

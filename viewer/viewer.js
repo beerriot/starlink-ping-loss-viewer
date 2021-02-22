@@ -466,7 +466,7 @@ function plotTimeseriesData() {
         var svgy = l.offsetY;
         tooltip.setAttribute("transform", "translate("+(svgx+mouseoffsetx)+","+(svgy+mouseoffsety)+")");
 
-        var index = Math.floor(svgy/boxHeight)*stripeLength + Math.floor(svgx/boxWidth) + offset;
+        var index = Math.floor(svgy/boxHeightV())*stripeLength + Math.floor(svgx/boxWidthV()) + offset;
         var hereDate = startdate ? new Date(startdate) : ""
         startdate && hereDate.setSeconds(hereDate.getSeconds() + index);
         time.innerHTML = index + " " + hereDate;

@@ -176,6 +176,49 @@ function makeBox(width, height, x, y, color, opacity) {
     return box
 }
 
+function makeSpans(boxWidth, boxHeight, stripeLength, start, end, color, opacity) {
+    if (end-start == 1) {
+        // Auto-handling 1-second "spans" makes the rest of the code simpler.
+        return [makeBox(boxWidth, boxHeight,
+                        (start * stripeLength) * boxWidth,
+                        Math.floor(start / stripeLength) * boxHeight,
+                        color, opacity)];
+    }
+
+    var nextEdge = (start % stripeLength == 0) ? start :
+        start + stripeLength - (start % stripeLength);
+    var prevEdge = end - (end % stripeLength)
+
+    var spans = [];
+
+    if (start < nextEdge) {
+        // Span does not begin at graph edge. Draw partial row.
+        var width = (Math.min(nextEdge, end) - start) * boxWidth;
+        var boxX = (start % stripeLength) * boxWidth
+        var boxY = Math.floor(start / stripeLength) * boxHeight;
+        spans.push(makeBox(width, boxHeight, boxX, boxY, color, opacity));
+    }
+
+    if (nextEdge < prevEdge) {
+        // There is a segment of the span that wraps edge to edge.
+        var width = stripeLength * boxWidth;
+        var height = ((prevEdge - nextEdge) / stripeLength) * boxHeight;
+        var boxX = 0;
+        var boxY = Math.floor(nextEdge / stripeLength) * boxHeight;
+        spans.push(makeBox(width, height, boxX, boxY, color, opacity));
+    }
+
+    if (prevEdge < end && prevEdge > start) {
+        // Span does not end at graph edge. Draw partial row.
+        var width = (end - prevEdge) * boxWidth;
+        var boxX = 0;
+        var boxY = Math.floor(prevEdge / stripeLength) * boxHeight;
+        spans.push(makeBox(width, boxHeight, boxX, boxY, color, opacity));
+    }
+
+    return spans;
+}
+
 function dropType(sample) {
     return !sample.s ? "nosatellite" : (sample.o ? "obstructed" : "betadown")
 }
@@ -297,44 +340,29 @@ function plotTimeseriesData() {
     var height = Math.ceil(data.length / stripeLength) * boxHeight
     viewer.setAttribute("height", height)
 
+    var appendSpans = function(spans) {
+        for (var j = 0; j < spans.length; j++) {
+            viewer.append(spans[j]);
+        }
+    };
+
     if (display["connected"]) {
         if (connectedSpans == null) {
             console.log("No connected span data to plot!");
         } else {
             for (var i = 0; i < connectedSpans.length; i++) {
-                var start = connectedSpans[i].start - offset;
-                var nextEdge = (start % stripeLength == 0) ? start :
-                    start + stripeLength - (start % stripeLength);
-                var end = connectedSpans[i].end - offset;
-                var prevEdge = end - (end % stripeLength)
-
-                if (start < nextEdge) {
-                    // Span does not begin at graph edge. Draw partial row.
-                    var width = (Math.min(nextEdge, end) - start) * boxWidth;
-                    var boxX = (start % stripeLength) * boxWidth
-                    var boxY = Math.floor(start / stripeLength) * boxHeight;
-                    viewer.append(makeBox(width, boxHeight, boxX, boxY, colors.connected, 1));
-                }
-
-                if (nextEdge < prevEdge) {
-                    // There is a segment of the span that wraps edge to edge.
-                    var width = stripeLength * boxWidth;
-                    var height = ((prevEdge - nextEdge) / stripeLength) * boxHeight;
-                    var boxX = 0;
-                    var boxY = Math.floor(nextEdge / stripeLength) * boxHeight;
-                    viewer.append(makeBox(width, height, boxX, boxY, colors.connected, 1));
-                }
-
-                if (prevEdge < end && prevEdge > start) {
-                    // Span does not end at graph edge. Draw partial row.
-                    var width = (end - prevEdge) * boxWidth;
-                    var boxX = 0;
-                    var boxY = Math.floor(prevEdge / stripeLength) * boxHeight;
-                    viewer.append(makeBox(width, boxHeight, boxX, boxY, colors.connected, 1));
-                }
+                appendSpans(makeSpans(boxWidth, boxHeight, stripeLength,
+                                      connectedSpans[i].start-offset,
+                                      connectedSpans[i].end-offset,
+                                      colors.connected, 1));
             }
         }
     }
+
+    // accumulators for drop spans
+    var dType = null;
+    var dLevel = null;
+    var dLength = 0;
 
     for (var i = offset; i < data.length; i++) {
         var boxX = ((i-offset) % stripeLength) * boxWidth
@@ -343,8 +371,28 @@ function plotTimeseriesData() {
             viewer.append(makeBox(boxWidth, boxHeight, boxX, boxY, colors.snr, 1-(data[i].n/9)));
         }
         if (shouldShowDropAt(i, minLossRatio)) {
-            var opacity = data[i].d
-            viewer.append(makeBox(boxWidth, boxHeight, boxX, boxY, colors[dropType(data[i])], opacity))
+            var newDType = dropType(data[i]);
+            if (newDType != dType || data[i].d != dLevel) {
+                // drop span ended in a new drop span
+                if (dType != null) {
+                    appendSpans(makeSpans(boxWidth, boxHeight, stripeLength,
+                                          i-dLength, i,
+                                          colors[dType], dLevel));
+                }
+                dType = newDType;
+                dLevel = data[i].d;
+                dLength = 1;
+            } else {
+                dLength += 1;
+            }
+        } else if (dType != null) {
+            // drop span ended in a non-drop span
+            appendSpans(makeSpans(boxWidth, boxHeight, stripeLength,
+                                  i-dLength, i,
+                                  colors[dType], dLevel));
+            dType = null;
+            dLevel = null;
+            dLength = 0;
         }
     }
 

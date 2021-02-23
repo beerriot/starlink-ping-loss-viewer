@@ -55,9 +55,12 @@ If you want to stop collecting data, run `launchd unload
 
 ## Reducer / aggregation
 
-Once you have one or more downloads, you'll need to reprocess it into
-the format that the viewer wants to use. That's done with the scripts
-in the `reducer` directory.
+To view just one download, copy it, or symlink it, to
+`viewer/viewer-data.json`.
+
+If instead you'd like to view the content of multiple downloads at once,
+you'll need to reprocess them into a unified format. That's done with
+the scripts in the `reducer` directory.
 
 Assuming you have several downloads in a `data/` directory:
 

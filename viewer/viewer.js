@@ -491,17 +491,74 @@ function plotTimeseriesData() {
 
 }
 
+function dateFromFilename(filename) {
+    var dateparts = filename.match(/(\d\d\d\d)-(\d\d)-(\d\d)-(\d\d)(\d\d)(\d\d).json/)
+    if (dateparts.length == 7) {
+        return new Date(dateparts[1], parseInt(dateparts[2])-1, dateparts[3], dateparts[4], dateparts[5], dateparts[6]);
+    }
+
+    // date not parseable
+    return null;
+}
+
+function processRawFileData(history, start, end) {
+    for (var i = start; i < end; i++) {
+        data.push({
+            d: history.popPingDropRate[i],
+            o: history.obstructed[i],
+            s: history.scheduled[i],
+            n: history.snr[i]
+        });
+    }
+}
+
+// Consume the raw grpcurl dishGetHistory response
+function processRawFile(jsondata) {
+    var uptime = jsondata.dishGetHistory.current;
+    var ringbufferSize = jsondata.dishGetHistory.popPingDropRate.length;
+
+    data = [];
+    if (uptime <= ringbufferSize) {
+        processRawFileData(jsondata.dishGetHistory, 0, uptime);
+    } else {
+        var oldestPoint = uptime % ringbufferSize;
+        processRawFileData(jsondata.dishGetHistory, oldestPoint, ringbufferSize);
+        processRawFileData(jsondata.dishGetHistory, 0, oldestPoint);
+    }
+
+    // TODO: set start date
+}
+
+// Consume our preprocessed format
+function processPreprocessedFile(jsondata) {
+    data = jsondata.data;
+
+    var lastFilename = null;
+    if ("filenames" in jsondata && jsondata.filenames.length > 0) {
+        lastFilename = jsondata.filenames[jsondata.filenames.length-1];
+    } else if ("filename" in jsondata) {
+        lastFilename = jsondata.filename;
+    }
+
+    if (lastFilename != null) {
+        startdate = dateFromFilename(lastFilename);
+
+        if (startdate != null) {
+            startdate.setSeconds(startdate.getSeconds() - data.length);
+        }
+    }
+}
+
 function loadData() {
     if (this.status == 200) {
         console.log("Received data "+this.responseText.length+" bytes");
         var jsondata = JSON.parse(this.responseText);
 
-        data = jsondata.data;
-
-        var lastfilename = (jsondata.filenames.length > 1) && jsondata.filenames[jsondata.filenames.length-1]
-        var dateparts = lastfilename.match(/(\d\d\d\d)-(\d\d)-(\d\d)-(\d\d)(\d\d)(\d\d).json/)
-        startdate = dateparts.length == 7 && new Date(dateparts[1], parseInt(dateparts[2])-1, dateparts[3], dateparts[4], dateparts[5], dateparts[6])
-        startdate.setSeconds(startdate.getSeconds() - data.length);
+        if ("data" in jsondata) {
+            processPreprocessedFile(jsondata);
+        } else {
+            processRawFile(jsondata);
+        }
 
         plot();
     } else {

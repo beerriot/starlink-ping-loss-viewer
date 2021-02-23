@@ -6,6 +6,8 @@ var startdate = null;
 var connectedSpans = null;
 // Histogram of span lengths. Computed by analyzing `data` at plot time.
 var spanHisto = null;
+// Map of how often each span type abuts another.
+var adjacencies = null;
 
 // Rendering parameters are functions with captured values. The
 // function alters the captured value by the passed amount, and
@@ -236,10 +238,11 @@ function plot() {
     analyzeData()
     plotTimeseriesData()
     plotHistogramData()
+    plotAdjacencies()
 }
 
 function analyzeData() {
-    if (connectedSpans != null && spanHisto != null) {
+    if (connectedSpans != null && spanHisto != null && adjacencies != null) {
         // don't redo this work if we don't expect it to change
         return;
     }
@@ -258,6 +261,20 @@ function analyzeData() {
             nosatellite: [0,0],
             connected: [0,0]
         };
+    }
+
+    adjacencies = {
+        "obstructed": {"total": 0, "betadown": 0, "nosatellite": 0, "connected": 0},
+        "betadown": {"total": 0, "obstructed": 0, "nosatellite": 0, "connected": 0},
+        "nosatellite": {"total": 0, "obstructed": 0, "betadown": 0, "connected": 0},
+        "connected": {"total": 0, "obstructed": 0, "betadown": 0, "nosatellite": 0}
+    };
+
+    var addAdjacency = function(from, to) {
+        adjacencies[from][to] += 1;
+        adjacencies[from].total += 1;
+        adjacencies[to][from] += 1;
+        adjacencies[to].total += 1;
     }
 
     // Memoization so we don't have to keep calling these in the loop.
@@ -281,6 +298,7 @@ function analyzeData() {
         if (!shouldShowDropAt(i, minLossRatio)) {
             if (dLength > 0) {
                 addToHisto(dType, dLength);
+                addAdjacency("connected", dType);
                 dType = null;
                 dLength = 0;
             }
@@ -288,9 +306,12 @@ function analyzeData() {
             connectedLength += 1;
         } else {
             totalDLength += 1;
+            var newDType = dropType(data[i]);
+
             if (totalDLength > connectedMaxDSec) {
                 if (connectedLength > 0) {
                     addToHisto("connected", connectedLength);
+                    addAdjacency("connected", newDType);
                 }
                 if (connectedLength >= connectedMinSec) {
                     connectedSpans.push({"start":i-connectedLength, "end":i});
@@ -300,11 +321,11 @@ function analyzeData() {
                 connectedLength += 1;
             }
 
-            var newDType = dropType(data[i]);
             if (dType == null) {
                 dType = newDType;
             } else if (dType != newDType) {
                 addToHisto(dType, dLength);
+                addAdjacency(dType, newDType);
                 dType = newDType;
                 dLength = 0;
             }
@@ -645,6 +666,60 @@ function plotHistogramData() {
     }
     histo.append(graph);
     document.body.append(histo)
+}
+
+function plotAdjacencies() {
+    if (adjacencies == null) {
+        console.log("No adjacency data to plot!");
+        return;
+    }
+
+    var table = document.getElementById("adjacencies");
+    if (table != null) {
+        table.remove();
+    }
+
+    table = document.createElement("table");
+    table.setAttribute("id", "adjacencies");
+    var caption = document.createElement("caption");
+    caption.textContent = "Adjacenies (percentage of row that abut column)"
+    table.append(caption);
+
+    var types = ["obstructed", "betadown", "nosatellite", "connected"];
+
+    var tr = document.createElement("tr");
+    table.append(tr);
+    tr.append(document.createElement("th"));
+    for (var i = 0; i < types.length; i++) {
+        var th = document.createElement("th");
+        th.textContent = types[i];
+        tr.append(th);
+    }
+
+    for (var r = 0; r < types.length; r++) {
+        tr = document.createElement("tr");
+        table.append(tr);
+        var th = document.createElement("th");
+        th.textContent = types[r];
+        tr.append(th);
+        for (var c = 0; c < types.length; c++) {
+            var td = document.createElement("td");
+            td.setAttribute("style", "text-align: right");
+            if (r != c) {
+                if (!display[types[r]] || !display[types[c]]) {
+                    td.textContent = "-";
+                } else {
+                    var percent = Math.floor(
+                        (adjacencies[types[r]][types[c]] / adjacencies[types[r]].total)
+                            * 100 + 0.5);
+                    td.textContent = adjacencies[types[r]][types[c]] +
+                        " (" + percent + "%)";
+                }
+            }
+            tr.append(td);
+        }
+    }
+    document.body.append(table);
 }
 
 var dataReq = new XMLHttpRequest();

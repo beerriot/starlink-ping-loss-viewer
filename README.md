@@ -193,6 +193,11 @@ ignored without affecting other data. "Min Clear Sec" is ignored for
 the purposes of the histogram, since recording smaller spans here does
 not prevent charting longer spans.
 
+Below the histogram is a table of "adjacencies". Each cell counts the
+number of times where a span of the type of that row abuts a span of
+the type of that column. Percentages are of the total adjacencies for
+the row.
+
 ## Results
 
 The idea behind the viewer is that the beam between the dish and the

@@ -14,6 +14,7 @@
 from http.server import SimpleHTTPRequestHandler,HTTPServer
 import json
 import os
+import subprocess
 import sys
 
 class ViewerHandler(SimpleHTTPRequestHandler):
@@ -25,13 +26,18 @@ class ViewerHandler(SimpleHTTPRequestHandler):
 
     def do_data_get(self):
         if len(self.path[5:]) > 1:
-            self.do_data_file_get()
+            if self.path[5:] == "/current":
+                self.do_data_current_get()
+            else:
+                self.do_data_file_get()
         else:
             self.do_data_list_get()
 
     def do_data_list_get(self):
+        file_list = self.list_data_files()
+        file_list.append("current")
         response = {
-            "data_files": self.list_data_files()
+            "data_files": file_list
             }
         response_str = json.dumps(response)
 
@@ -43,6 +49,14 @@ class ViewerHandler(SimpleHTTPRequestHandler):
     def list_data_files(self):
         files = os.listdir(self.server.starlink_data_dir)
         return [ f[:-5] for f in files if f.endswith('.json')]
+
+    def do_data_current_get(self):
+        result = subprocess.run(['grpcurl', '-plaintext', '-d', '{\"get_history\":{}}', '192.168.100.1:9200', 'SpaceX.API.Device.Device/Handle'], check=True, stdout=subprocess.PIPE)
+
+        self.send_response(200)
+        self.send_header('Content-type', 'application/json')
+        self.end_headers()
+        self.wfile.write(result.stdout)
 
     def do_data_file_get(self):
         path = os.path.join(self.server.starlink_data_dir,

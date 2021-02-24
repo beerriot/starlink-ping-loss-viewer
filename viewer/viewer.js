@@ -779,7 +779,36 @@ function plotAdjacencies() {
     document.body.append(table);
 }
 
-var dataReq = new XMLHttpRequest();
-dataReq.addEventListener("load", loadData);
-dataReq.open("GET", "viewer-data.json");
-dataReq.send();
+function loadList() {
+    if (this.status == 200) {
+        console.log("Received list "+this.responseText.length+" bytes");
+        var jsondata = JSON.parse(this.responseText);
+
+        jsondata.data_files.sort();
+        var select = document.getElementById("datafile");
+
+        // add in reverse order, so newest is at the top
+        for (var i = jsondata.data_files.length - 1; i >= 0; i--) {
+            var option = document.createElement("option");
+            option.setAttribute("value", jsondata.data_files[i]);
+            option.textContent = jsondata.data_files[i];
+            select.append(option);
+        }
+
+        select.addEventListener("change", function() {
+            var path = "/data/" + select.value;
+
+            var dataReq = new XMLHttpRequest();
+            dataReq.addEventListener("load", loadData);
+            dataReq.open("GET", path);
+            dataReq.send();
+        });
+    } else {
+        console.log("Received non-200 status: "+this.status);
+    }
+}
+
+var dataListReq = new XMLHttpRequest();
+dataListReq.addEventListener("load", loadList);
+dataListReq.open("GET", "/data");
+dataListReq.send();

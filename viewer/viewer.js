@@ -5,6 +5,9 @@ var data = [];
 // uptime) value, so we don't re-add that data.
 var lastUptime = null;
 
+// The date we read determined the last processed file was written.
+var lastFiledate = null;
+
 // Datetime of earliest sample.
 var startdate = null;
 // Spans of uninterrupted connectivity. Computed by analyzing `data` at plot time.
@@ -57,7 +60,8 @@ var display = {
     "betadown": true,
     "nosatellite": false,
     "snr": false,
-    "connected": false
+    "connected": false,
+    "unrecorded": true
 };
 
 var colors = {
@@ -65,7 +69,8 @@ var colors = {
     betadown: "#0000ff",
     nosatellite: "#00ff00",
     snr: "#999999",
-    connected: "#ffee00"
+    connected: "#ffee00",
+    unrecorded: "#333333"
 };
 
 // Smallest data[i].d to render.
@@ -224,7 +229,8 @@ function makeSpans(stripeLength, start, end, color, opacity) {
 }
 
 function dropType(sample) {
-    return !sample.s ? "nosatellite" : (sample.o ? "obstructed" : "betadown")
+    return sample.u ? "unrecorded" :
+        (!sample.s ? "nosatellite" : (sample.o ? "obstructed" : "betadown"))
 }
 
 function shouldShowDropAt(index, minLossRatio) {
@@ -264,15 +270,17 @@ function analyzeData() {
             obstructed: [0,0],
             betadown: [0,0],
             nosatellite: [0,0],
-            connected: [0,0]
+            connected: [0,0],
+            unrecorded: [0,0]
         };
     }
 
     adjacencies = {
-        "obstructed": {"total": 0, "betadown": 0, "nosatellite": 0, "connected": 0},
-        "betadown": {"total": 0, "obstructed": 0, "nosatellite": 0, "connected": 0},
-        "nosatellite": {"total": 0, "obstructed": 0, "betadown": 0, "connected": 0},
-        "connected": {"total": 0, "obstructed": 0, "betadown": 0, "nosatellite": 0}
+        "obstructed": {"total": 0, "betadown": 0, "nosatellite": 0, "connected": 0, "unrecorded": 0},
+        "betadown": {"total": 0, "obstructed": 0, "nosatellite": 0, "connected": 0, "unrecorded": 0},
+        "nosatellite": {"total": 0, "obstructed": 0, "betadown": 0, "connected": 0, "unrecorded": 0},
+        "connected": {"total": 0, "obstructed": 0, "betadown": 0, "nosatellite": 0, "unrecorded": 0},
+        "unrecorded": {"total": 0, "obstructed": 0, "betadown": 0, "nosatellite": 0, "connected": 0}
     };
 
     var addAdjacency = function(from, to) {
@@ -512,66 +520,127 @@ function processRawFileData(history, start, end) {
             d: history.popPingDropRate[i],
             o: history.obstructed[i],
             s: history.scheduled[i],
-            n: history.snr[i]
+            n: history.snr[i],
+            u: false
         });
+    }
+}
+
+function addUnrecordedData(length) {
+    while (length > 0) {
+        data.push({d: 1, o: false, s: true, n: 9, u: true});
+        length--;
     }
 }
 
 // Consume the raw grpcurl dishGetHistory response
 function processRawFile(jsondata, filename) {
-    var uptime = jsondata.dishGetHistory.current;
+    var uptime = parseInt(jsondata.dishGetHistory.current);
     var ringbufferSize = jsondata.dishGetHistory.popPingDropRate.length;
+
+    var filedate = dateFromFilename(filename);
+    if (filedate == null) {
+        console.log("Could not determine datetime of file");
+    }
 
     if (uptime <= ringbufferSize) {
         // less than 12hr since recent
-        var start = lastUptime == null ? 0 : lastUptime;
-        if (lastUptime != null && lastUptime > uptime) {
-            // TODO: handle reset mid-selection
-            console.log("TODO: handle reset mid-selection");
-        }
-        processRawFileData(jsondata.dishGetHistory, start, uptime);
-    } else {
-        if (lastUptime == null ||
-            uptime - lastUptime > ringbufferSize ||
-            uptime < lastUptime) {
-            // first file, or only file, or first file after a break
-            // or reset - just copy the whole thing from the current
-            // offset
+        if (lastUptime == null) {
+            // our first file, or first since reset
+            processRawFileData(jsondata.dishGetHistory, 0, uptime);
+        } else if (filedate != null && lastFiledate != null) {
+            var secondsSinceDate = (filedate - lastFiledate) / 1000;
+            if (lastUptime > uptime || secondsSinceDate >= uptime) {
+                // Data in this file is unrelated to data in the previous file.
 
-            if (lastUptime != null) {
-                if (uptime < lastUptime) {
-                    // TODO: handle log reset mid-selection
-                    console.log("TODO: handle long reset mid-selection");
-                } else if (uptime - lastUptime > ringbufferSize) {
-                    // TODO: handle gap mid-selection
-                    console.log("TODO: handle gap mid-selection");
+                var lostTime = secondsSinceDate-uptime;
+                if (lostTime > 0) {
+                    console.log("Found time lost during reset: "+lostTime+" seconds after "+lastFiledate);
+                    addUnrecordedData(lostTime);
                 }
-            }
 
+                processRawFileData(jsondata.dishGetHistory, 0, uptime);
+            } else {
+                // This is just continuation of the data in the previous file.
+                processRawFileData(jsondata.dishGetHistory, lastUptime, uptime);
+            }
+        } else {
+            console.log("Warning: relying on uptime only from "+lastUptime+" to "+uptime+" in file "+filename);
+
+            var start = (lastUptime == null || lastUptime > uptime) ? 0 : lastUptime;
+            processRawFileData(jsondata.dishGetHistory, start, uptime);
+        }
+    } else {
+        if (lastUptime == null) {
+            // first or only file - just copy the whole buffer
             var oldestPoint = uptime % ringbufferSize;
             processRawFileData(jsondata.dishGetHistory, oldestPoint, ringbufferSize);
             processRawFileData(jsondata.dishGetHistory, 0, oldestPoint);
-        } else {
-            var leftOffAt = lastUptime % ringbufferSize;
-            var endOfLatest = uptime % ringbufferSize;
-            if (leftOffAt < endOfLatest) {
-                // haven't wrapped the ring buffer
-                processRawFileData(jsondata.dishGetHistory, leftOffAt, endOfLatest);
+        } else if (filedate != null && lastFiledate != null) {
+            var secondsSinceDate = (filedate - lastFiledate) / 1000;
+            if (lastUptime > uptime || secondsSinceDate >= ringbufferSize) {
+                // Data in this file is unrelated to data in the previous file.
+
+                var lostTime = secondsSinceDate-uptime;
+                if (lostTime > 0) {
+                    console.log("Found time lost during reset: "+lostTime+" seconds after "+lastFiledate);
+                    addUnrecordedData(lostTime);
+                }
+
+                var oldestPoint = uptime % ringbufferSize;
+                processRawFileData(jsondata.dishGetHistory, oldestPoint, ringbufferSize);
+                processRawFileData(jsondata.dishGetHistory, 0, oldestPoint);
             } else {
-                // have wrapped the ring buffer
-                processRawFileData(jsondata.dishGetHistory, leftOffAt, ringbufferSize);
-                processRawFileData(jsondata.dishGetHistory, 0, endOfLatest);
+                // This is just continuation of the data in the previous file.
+                var leftOffAt = lastUptime % ringbufferSize;
+                var endOfLatest = uptime % ringbufferSize;
+                if (leftOffAt < endOfLatest) {
+                    // haven't wrapped the ring buffer
+                    processRawFileData(jsondata.dishGetHistory, leftOffAt, endOfLatest);
+                } else {
+                    // have wrapped the ring buffer
+                    processRawFileData(jsondata.dishGetHistory, leftOffAt, ringbufferSize);
+                    processRawFileData(jsondata.dishGetHistory, 0, endOfLatest);
+                }
+            }
+        } else {
+            // do what we can with uptime only
+            if (uptime - lastUptime > ringbufferSize) {
+                // ring buffer overflowed, add missing and copy all
+                addUnrecordedData(uptime - lastUptime - ringbufferSize);
+                var oldestPoint = uptime % ringbufferSize;
+                processRawFileData(jsondata.dishGetHistory, oldestPoint, ringbufferSize);
+                processRawFileData(jsondata.dishGetHistory, 0, oldestPoint);
+            } else if (uptime < lastUptime) {
+                // system reset betweeen then and now
+                console.log("Reset detected without date to work with at file "+filename);
+                var oldestPoint = uptime % ringbufferSize;
+                processRawFileData(jsondata.dishGetHistory, oldestPoint, ringbufferSize);
+                processRawFileData(jsondata.dishGetHistory, 0, oldestPoint);
+            } else {
+                // The happy path - uptime and lastUptime are related
+                // and close enough to only need part of the ring
+                // buffer.
+                var leftOffAt = lastUptime % ringbufferSize;
+                var endOfLatest = uptime % ringbufferSize;
+                if (leftOffAt < endOfLatest) {
+                    // haven't wrapped the ring buffer
+                    processRawFileData(jsondata.dishGetHistory, leftOffAt, endOfLatest);
+                } else {
+                    // have wrapped the ring buffer
+                    processRawFileData(jsondata.dishGetHistory, leftOffAt, ringbufferSize);
+                    processRawFileData(jsondata.dishGetHistory, 0, endOfLatest);
+                }
             }
         }
     }
 
     lastUptime = uptime;
+    lastFiledate = filedate;
 
-    if (startdate == null) {
-        startdate = dateFromFilename(filename);
-        if (startdate != null) {
-            startdate.setSeconds(startdate.getSeconds() - data.length);
-        }
+    if (startdate == null && filedate != null) {
+        startdate = new Date(filedate);
+        startdate.setSeconds(startdate.getSeconds() - data.length);
     }
 }
 
@@ -845,6 +914,7 @@ function loadList() {
 
             data = [];
             lastUptime = null;
+            lastFiledate = null;
             connectedSpans = null;
             spanHisto = null;
             adjacencies = null;

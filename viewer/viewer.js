@@ -1,5 +1,10 @@
 // Samples will be loaded here.
-var data = []
+var data = [];
+
+// If we're loading unprocessed dumps, remember the last "current" (==
+// uptime) value, so we don't re-add that data.
+var lastUptime = null;
+
 // Datetime of earliest sample.
 var startdate = null;
 // Spans of uninterrupted connectivity. Computed by analyzing `data` at plot time.
@@ -492,8 +497,8 @@ function plotTimeseriesData() {
 }
 
 function dateFromFilename(filename) {
-    var dateparts = filename.match(/(\d\d\d\d)-(\d\d)-(\d\d)-(\d\d)(\d\d)(\d\d).json/)
-    if (dateparts.length == 7) {
+    var dateparts = filename.match(/(\d\d\d\d)-(\d\d)-(\d\d)-(\d\d)(\d\d)(\d\d)/)
+    if (dateparts && dateparts.length == 7) {
         return new Date(dateparts[1], parseInt(dateparts[2])-1, dateparts[3], dateparts[4], dateparts[5], dateparts[6]);
     }
 
@@ -513,56 +518,90 @@ function processRawFileData(history, start, end) {
 }
 
 // Consume the raw grpcurl dishGetHistory response
-function processRawFile(jsondata) {
+function processRawFile(jsondata, filename) {
     var uptime = jsondata.dishGetHistory.current;
     var ringbufferSize = jsondata.dishGetHistory.popPingDropRate.length;
 
-    data = [];
     if (uptime <= ringbufferSize) {
-        processRawFileData(jsondata.dishGetHistory, 0, uptime);
+        // less than 12hr since recent
+        var start = lastUptime == null ? 0 : lastUptime;
+        if (lastUptime != null && lastUptime > uptime) {
+            // TODO: handle reset mid-selection
+            console.log("TODO: handle reset mid-selection");
+        }
+        processRawFileData(jsondata.dishGetHistory, start, uptime);
     } else {
-        var oldestPoint = uptime % ringbufferSize;
-        processRawFileData(jsondata.dishGetHistory, oldestPoint, ringbufferSize);
-        processRawFileData(jsondata.dishGetHistory, 0, oldestPoint);
+        if (lastUptime == null ||
+            uptime - lastUptime > ringbufferSize ||
+            uptime < lastUptime) {
+            // first file, or only file, or first file after a break
+            // or reset - just copy the whole thing from the current
+            // offset
+
+            if (lastUptime != null) {
+                if (uptime < lastUptime) {
+                    // TODO: handle log reset mid-selection
+                    console.log("TODO: handle long reset mid-selection");
+                } else if (uptime - lastUptime > ringbufferSize) {
+                    // TODO: handle gap mid-selection
+                    console.log("TODO: handle gap mid-selection");
+                }
+            }
+
+            var oldestPoint = uptime % ringbufferSize;
+            processRawFileData(jsondata.dishGetHistory, oldestPoint, ringbufferSize);
+            processRawFileData(jsondata.dishGetHistory, 0, oldestPoint);
+        } else {
+            var leftOffAt = lastUptime % ringbufferSize;
+            var endOfLatest = uptime % ringbufferSize;
+            if (leftOffAt < endOfLatest) {
+                // haven't wrapped the ring buffer
+                processRawFileData(jsondata.dishGetHistory, leftOffAt, endOfLatest);
+            } else {
+                // have wrapped the ring buffer
+                processRawFileData(jsondata.dishGetHistory, leftOffAt, ringbufferSize);
+                processRawFileData(jsondata.dishGetHistory, 0, endOfLatest);
+            }
+        }
     }
 
-    // TODO: set start date
-}
+    lastUptime = uptime;
 
-// Consume our preprocessed format
-function processPreprocessedFile(jsondata) {
-    data = jsondata.data;
-
-    var lastFilename = null;
-    if ("filenames" in jsondata && jsondata.filenames.length > 0) {
-        lastFilename = jsondata.filenames[jsondata.filenames.length-1];
-    } else if ("filename" in jsondata) {
-        lastFilename = jsondata.filename;
-    }
-
-    if (lastFilename != null) {
-        startdate = dateFromFilename(lastFilename);
-
+    if (startdate == null) {
+        startdate = dateFromFilename(filename);
         if (startdate != null) {
             startdate.setSeconds(startdate.getSeconds() - data.length);
         }
     }
 }
 
-function loadData() {
-    if (this.status == 200) {
-        console.log("Received data "+this.responseText.length+" bytes");
-        var jsondata = JSON.parse(this.responseText);
+// Consume our preprocessed format
+function processPreprocessedFile(jsondata) {
+    data.concat(jsondata.data);
 
-        if ("data" in jsondata) {
-            processPreprocessedFile(jsondata);
-        } else {
-            processRawFile(jsondata);
+    if (startdate == null) {
+        var lastFilename = null;
+        if ("filenames" in jsondata && jsondata.filenames.length > 0) {
+            lastFilename = jsondata.filenames[jsondata.filenames.length-1];
+        } else if ("filename" in jsondata) {
+            lastFilename = jsondata.filename;
         }
 
-        plot();
+        if (lastFilename != null) {
+            startdate = dateFromFilename(lastFilename);
+
+            if (startdate != null) {
+                startdate.setSeconds(startdate.getSeconds() - data.length);
+            }
+        }
+    }
+}
+
+function processData(jsondata, filename) {
+    if ("data" in jsondata) {
+        processPreprocessedFile(jsondata);
     } else {
-        console.log("Received non-200 status: "+this.status);
+        processRawFile(jsondata, filename);
     }
 }
 
@@ -785,6 +824,8 @@ function loadList() {
         var jsondata = JSON.parse(this.responseText);
 
         jsondata.data_files.sort();
+
+        document.getElementById("datafilePlaceholder").remove();
         var select = document.getElementById("datafile");
 
         // add in reverse order, so newest is at the top
@@ -796,15 +837,46 @@ function loadList() {
         }
 
         select.addEventListener("change", function() {
-            var path = "/data/" + select.value;
+            // pick up files in reverse order so that we download oldest first
+            var filesToLoad = []
+            for (var i = select.selectedOptions.length - 1; i >= 0; i--) {
+                filesToLoad.push(select.selectedOptions[i].value);
+            }
 
-            var dataReq = new XMLHttpRequest();
-            dataReq.addEventListener("load", loadData);
-            dataReq.open("GET", path);
-            dataReq.send();
+            data = [];
+            lastUptime = null;
+            connectedSpans = null;
+            spanHisto = null;
+            adjacencies = null;
+            startdate = null;
+            
+            loadFiles(filesToLoad);
         });
     } else {
+        document.getElementById("datafilePlaceholder").textContent =
+            "Unable to load list ("+this.status+")";
         console.log("Received non-200 status: "+this.status);
+    }
+}
+
+function loadFiles(filesToLoad) {
+    var nextfile = filesToLoad.shift();
+    if (nextfile) {
+        var path = "/data/" + nextfile;
+
+        var dataReq = new XMLHttpRequest();
+        dataReq.addEventListener("load", function() {
+            if (this.status == 200) {
+                processData(JSON.parse(this.responseText), nextfile);
+            } else {
+                console.log("Received non-200 status: "+this.status);
+            }
+            loadFiles(filesToLoad);
+        });
+        dataReq.open("GET", path);
+        dataReq.send();
+    } else {
+        plot();
     }
 }
 

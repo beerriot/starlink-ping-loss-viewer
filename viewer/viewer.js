@@ -526,6 +526,32 @@ function processRawFileData(history, start, end) {
     }
 }
 
+function processAllRawFileData(jsondata, uptime) {
+    var ringbufferSize = jsondata.dishGetHistory.popPingDropRate.length;
+    if (uptime < ringbufferSize) {
+        processRawFileData(jsondata.dishGetHistory, 0, uptime);
+    } else {
+        var oldestPoint = uptime % ringbufferSize;
+        processRawFileData(jsondata.dishGetHistory, oldestPoint, ringbufferSize);
+        processRawFileData(jsondata.dishGetHistory, 0, oldestPoint);
+    }
+}
+
+function processContinuedRawFileData(jsondata, uptime) {
+    var ringbufferSize = jsondata.dishGetHistory.popPingDropRate.length;
+
+    var leftOffAt = lastUptime % ringbufferSize;
+    var endOfLatest = uptime % ringbufferSize;
+    if (leftOffAt < endOfLatest) {
+        // haven't wrapped the ring buffer
+        processRawFileData(jsondata.dishGetHistory, leftOffAt, endOfLatest);
+    } else {
+        // have wrapped the ring buffer
+        processRawFileData(jsondata.dishGetHistory, leftOffAt, ringbufferSize);
+        processRawFileData(jsondata.dishGetHistory, 0, endOfLatest);
+    }
+}
+
 function addUnrecordedData(length) {
     while (length > 0) {
         data.push({d: 1, o: false, s: true, n: 9, u: true});
@@ -545,13 +571,7 @@ function processRawFile(jsondata, filename) {
 
     if (lastUptime == null) {
         // our first file
-        if (uptime < ringbufferSize) {
-            processRawFileData(jsondata.dishGetHistory, 0, uptime);
-        } else {
-            var oldestPoint = uptime % ringbufferSize;
-            processRawFileData(jsondata.dishGetHistory, oldestPoint, ringbufferSize);
-            processRawFileData(jsondata.dishGetHistory, 0, oldestPoint);
-        }
+        processAllRawFileData(jsondata, uptime);
     } else if (filedate != null && lastFiledate != null) {
         var secondsSinceDate = (filedate - lastFiledate) / 1000;
         if (lastUptime > uptime ||
@@ -566,58 +586,26 @@ function processRawFile(jsondata, filename) {
                 addUnrecordedData(lostTime);
             }
 
-            if (uptime < ringbufferSize) {
-                processRawFileData(jsondata.dishGetHistory, 0, uptime);
-            } else {
-                var oldestPoint = uptime % ringbufferSize;
-                processRawFileData(jsondata.dishGetHistory, oldestPoint, ringbufferSize);
-                processRawFileData(jsondata.dishGetHistory, 0, oldestPoint);
-            }
+            processAllRawFileData(jsondata, uptime);
         } else {
             // This is just continuation of the data in the previous file.
-            var leftOffAt = lastUptime % ringbufferSize;
-            var endOfLatest = uptime % ringbufferSize;
-            if (leftOffAt < endOfLatest) {
-                // haven't wrapped the ring buffer
-                processRawFileData(jsondata.dishGetHistory, leftOffAt, endOfLatest);
-            } else {
-                // have wrapped the ring buffer
-                processRawFileData(jsondata.dishGetHistory, leftOffAt, ringbufferSize);
-                processRawFileData(jsondata.dishGetHistory, 0, endOfLatest);
-            }
+            processContinuedRawFileData(jsondata, uptime);
         }
     } else {
         console.log("Warning: relying on uptime only from "+lastUptime+" to "+uptime+" in file "+filename);
         if (uptime - lastUptime > ringbufferSize) {
             // ring buffer overflowed, add missing and copy all
             addUnrecordedData(uptime - lastUptime - ringbufferSize);
-            var oldestPoint = uptime % ringbufferSize;
-            processRawFileData(jsondata.dishGetHistory, oldestPoint, ringbufferSize);
-            processRawFileData(jsondata.dishGetHistory, 0, oldestPoint);
+            processAllRawFileData(jsondata, uptime);
         } else if (uptime < lastUptime) {
             // system reset betweeen then and now
             console.log("Reset detected without date to work with at file "+filename);
-            if (uptime < ringbufferSize) {
-                processRawFileData(jsondata.dishGetHistory, 0, uptime);
-            } else {
-                var oldestPoint = uptime % ringbufferSize;
-                processRawFileData(jsondata.dishGetHistory, oldestPoint, ringbufferSize);
-                processRawFileData(jsondata.dishGetHistory, 0, oldestPoint);
-            }
+            processAllRawFileData(jsondata, uptime);
         } else {
             // The happy path - uptime and lastUptime are related
             // and close enough to only need part of the ring
             // buffer.
-            var leftOffAt = lastUptime % ringbufferSize;
-            var endOfLatest = uptime % ringbufferSize;
-            if (leftOffAt < endOfLatest) {
-                // haven't wrapped the ring buffer
-                processRawFileData(jsondata.dishGetHistory, leftOffAt, endOfLatest);
-            } else {
-                // have wrapped the ring buffer
-                processRawFileData(jsondata.dishGetHistory, leftOffAt, ringbufferSize);
-                processRawFileData(jsondata.dishGetHistory, 0, endOfLatest);
-            }
+            processContinuedRawFileData(jsondata, uptime);
         }
     }
 

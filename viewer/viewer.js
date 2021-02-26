@@ -1,5 +1,28 @@
 // Samples will be loaded here.
-var data = [];
+var data = null;
+
+// The `addData` function expects field names to work with. Add field
+// names from the dishGetHistory response here, to have them available
+// for analysis and rendering.
+function clearData() {
+    data = {
+        "popPingDropRate": [],
+        "obstructed": [],
+        "scheduled": [],
+        "snr": [],
+        "unrecorded": []
+    };
+}
+
+// What values to put in the arrays above during periods where we have
+// no data. All fields added to `data` must be present here.
+let unrecordedTemplate = {
+    "popPingDropRate": 1,
+    "obstructed": false,
+    "scheduled": true,
+    "snr": 9,
+    "unrecorded": true
+};
 
 // Remember the last "current" (== uptime) value from the most
 // recently loaded file in the selected list, so we don't re-add that
@@ -75,11 +98,11 @@ var colors = {
     unrecorded: "#333333"
 };
 
-// Smallest data[i].d to render.
+// Smallest data.popPingDropRate[i] to render.
 var minLossRatioV = constrainedValue(0, 1);
 minLossRatioV(1);
 
-// Largest data[i].n to render. (init == 0)
+// Largest data.snr[i] to render. (init == 0)
 var maxSnrV = constrainedValue(0, 9);
 
 // What constitues a connected region.
@@ -230,19 +253,28 @@ function makeSpans(stripeLength, start, end, color, opacity) {
     return spans;
 }
 
-function dropType(sample) {
-    return sample.u ? "unrecorded" :
-        (!sample.s ? "nosatellite" : (sample.o ? "obstructed" : "betadown"))
+function dropType(i) {
+    return data.unrecorded[i] ? "unrecorded" :
+        (!data.scheduled[i] ? "nosatellite" :
+         (data.obstructed[i] ? "obstructed" : "betadown"))
 }
 
 function shouldShowDropAt(index, minLossRatio) {
-    return display[dropType(data[index])] && (data[index].d >= minLossRatio);
+    return display[dropType(index)] &&
+        (data.popPingDropRate[index] >= minLossRatio);
+}
+
+function dataLength() {
+    // We're not keeping track of length explicitly. All arrays in
+    // data are the same length, so just return the length of any of
+    // them.
+    return data.popPingDropRate.length;
 }
 
 function rescale() {
     var viewer = document.getElementById("viewer");
     viewer.setAttribute("width", boxWidthV()*stripeLengthV());
-    viewer.setAttribute("height", boxHeightV()*Math.ceil(data.length/stripeLengthV()));
+    viewer.setAttribute("height", boxHeightV()*Math.ceil(dataLength()/stripeLengthV()));
     var spanGroup = viewer.getElementById("spans");
     spanGroup.setAttribute("transform", "scale("+boxWidthV()+","+boxHeightV()+")");
 }
@@ -309,7 +341,7 @@ function analyzeData() {
     // Type of the outage at i (but mostly referenced before update, so i-1)
     var dType = null;
 
-    for (var i = 0; i < data.length; i++) {
+    for (var i = 0; i < dataLength(); i++) {
         if (!shouldShowDropAt(i, minLossRatio)) {
             if (dLength > 0) {
                 addToHisto(dType, dLength);
@@ -321,7 +353,7 @@ function analyzeData() {
             connectedLength += 1;
         } else {
             totalDLength += 1;
-            var newDType = dropType(data[i]);
+            var newDType = dropType(i);
 
             if (totalDLength > connectedMaxDSec) {
                 if (connectedLength > 0) {
@@ -351,8 +383,8 @@ function analyzeData() {
     if (connectedLength > 0) {
         addToHisto("connected", connectedLength);
         if (connectedLength >= connectedMinSec) {
-            connectedSpans.push({"start":data.length-connectedLength,
-                                 "end":data.length});
+            connectedSpans.push({"start":dataLength()-connectedLength,
+                                 "end":dataLength()});
         }
     } else if (dLength > 0) {
         addToHisto(dType, dLength);
@@ -366,7 +398,7 @@ function plotTimeseriesData() {
     }
 
     // Memoize current values, so we don't have to call their
-    // functions data.length times.
+    // functions data[k].length times.
     var stripeLength = stripeLengthV();
     var offset = offsetV();
     var minLossRatio = minLossRatioV();
@@ -376,7 +408,7 @@ function plotTimeseriesData() {
     viewer.setAttribute("id", "viewer")
     var width = stripeLength * boxWidthV();
     viewer.setAttribute("width", width)
-    var height = Math.ceil(data.length / stripeLength) * boxHeightV()
+    var height = Math.ceil(dataLength() / stripeLength) * boxHeightV()
     viewer.setAttribute("height", height)
 
     var spanGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
@@ -412,17 +444,17 @@ function plotTimeseriesData() {
     var snrLevel = null;
     var snrLength = 0;
 
-    for (var i = offset; i < data.length; i++) {
+    for (var i = offset; i < dataLength(); i++) {
         var oi = i-offset;
-        if (display["snr"] && data[i].n <= maxSnr) {
-            if (data[i].n != snrLevel) {
+        if (display["snr"] && data.snr[i] <= maxSnr) {
+            if (data.snr[i] != snrLevel) {
                 // snr span ended in a different snr level
                 if (snrLevel != null) {
                     appendSpans(makeSpans(stripeLength,
                                           oi-snrLength, oi,
                                           colors.snr, 1-(snrLevel/9)));
                 }
-                snrLevel = data[i].n;
+                snrLevel = data.snr[i];
                 snrLength = 1;
             } else {
                 snrLength += 1;
@@ -437,8 +469,8 @@ function plotTimeseriesData() {
         }
 
         if (shouldShowDropAt(i, minLossRatio)) {
-            var newDType = dropType(data[i]);
-            if (newDType != dType || data[i].d != dLevel) {
+            var newDType = dropType(i);
+            if (newDType != dType || data.popPingDropRate[i] != dLevel) {
                 // drop span ended in a new drop span
                 if (dType != null) {
                     appendSpans(makeSpans(stripeLength,
@@ -446,7 +478,7 @@ function plotTimeseriesData() {
                                           colors[dType], dLevel));
                 }
                 dType = newDType;
-                dLevel = data[i].d;
+                dLevel = data.popPingDropRate[i];
                 dLength = 1;
             } else {
                 dLength += 1;
@@ -465,14 +497,16 @@ function plotTimeseriesData() {
     if (snrLevel != null) {
         // graph ended with an snr span
         appendSpans(makeSpans(stripeLength,
-                              data.length-offset-snrLength, data.length-offset,
+                              dataLength()-offset-snrLength,
+                              dataLength()-offset,
                               colors.snr, 1-(snrLevel/9)));
     }
 
     if (dType != null) {
         // graph ended with an outage
         appendSpans(makeSpans(stripeLength,
-                              data.length-offset-dLength, data.length-offset,
+                              dataLength()-offset-dLength,
+                              dataLength()-offset,
                               colors[dType], dLevel));
     }
 
@@ -503,7 +537,6 @@ function plotTimeseriesData() {
         startdate && hereDate.setSeconds(hereDate.getSeconds() + index);
         time.innerHTML = index + " " + hereDate;
     });
-
 }
 
 function dateFromFilename(filename) {
@@ -516,55 +549,59 @@ function dateFromFilename(filename) {
     return null;
 }
 
-function addData(history, start, end) {
-    for (var i = start; i < end; i++) {
-        data.push({
-            d: history.popPingDropRate[i],
-            o: history.obstructed[i],
-            s: history.scheduled[i],
-            n: history.snr[i],
-            u: false
-        });
+function addData(jsondata, start, end) {
+    for (var k in data) {
+        if (k == "unrecorded") {
+            // This one is our own, not part of Dishy's metrics.
+            var unrecorded = new Array(end-start);
+            unrecorded.fill(false);
+            data.unrecorded = data.unrecorded.concat(unrecorded);
+        } else {
+            data[k] = data[k].concat(jsondata.dishGetHistory[k].slice(start, end));
+        }
     }
 }
 
+function ringbufferSize(jsondata) {
+    // There is no explicit length field. All arrays are the same
+    // length, so just return the length of one of them.
+    return jsondata.dishGetHistory.popPingDropRate.length;
+}
+
 function addAllData(jsondata, uptime) {
-    var ringbufferSize = jsondata.dishGetHistory.popPingDropRate.length;
-    if (uptime < ringbufferSize) {
-        addData(jsondata.dishGetHistory, 0, uptime);
+    if (uptime < ringbufferSize(jsondata)) {
+        addData(jsondata, 0, uptime);
     } else {
-        var oldestPoint = uptime % ringbufferSize;
-        addData(jsondata.dishGetHistory, oldestPoint, ringbufferSize);
-        addData(jsondata.dishGetHistory, 0, oldestPoint);
+        var oldestPoint = uptime % ringbufferSize(jsondata);
+        addData(jsondata, oldestPoint, ringbufferSize(jsondata));
+        addData(jsondata, 0, oldestPoint);
     }
 }
 
 function addContinuedData(jsondata, uptime) {
-    var ringbufferSize = jsondata.dishGetHistory.popPingDropRate.length;
-
-    var leftOffAt = lastUptime % ringbufferSize;
-    var endOfLatest = uptime % ringbufferSize;
+    var leftOffAt = lastUptime % ringbufferSize(jsondata);
+    var endOfLatest = uptime % ringbufferSize(jsondata);
     if (leftOffAt < endOfLatest) {
         // haven't wrapped the ring buffer
-        addData(jsondata.dishGetHistory, leftOffAt, endOfLatest);
+        addData(jsondata, leftOffAt, endOfLatest);
     } else {
         // have wrapped the ring buffer
-        addData(jsondata.dishGetHistory, leftOffAt, ringbufferSize);
-        addData(jsondata.dishGetHistory, 0, endOfLatest);
+        addData(jsondata, leftOffAt, ringbufferSize(jsondata));
+        addData(jsondata, 0, endOfLatest);
     }
 }
 
 function addUnrecordedData(length) {
-    while (length > 0) {
-        data.push({d: 1, o: false, s: true, n: 9, u: true});
-        length--;
+    var unrecordedValues = new Array(length);
+    for (var k in data) {
+        unrecordedValues.fill(unrecordedTemplate[k]);
+        data[k] = data[k].concat(unrecordedValues);
     }
 }
 
 // Consume the raw grpcurl dishGetHistory response
 function consumeFile(jsondata, filename) {
     var uptime = parseInt(jsondata.dishGetHistory.current);
-    var ringbufferSize = jsondata.dishGetHistory.popPingDropRate.length;
 
     var filedate = dateFromFilename(filename);
     if (filedate == null) {
@@ -578,11 +615,11 @@ function consumeFile(jsondata, filename) {
         var secondsSinceDate = (filedate - lastFiledate) / 1000;
         if (lastUptime > uptime ||
             secondsSinceDate >= uptime ||
-            secondsSinceDate >= ringbufferSize) {
+            secondsSinceDate >= ringbufferSize(jsondata)) {
             // Data in this file is unrelated to data in the previous file.
 
             var lostTime = Math.max(secondsSinceDate-uptime,
-                                    secondsSinceDate-ringbufferSize);
+                                    secondsSinceDate-ringbufferSize(jsondata));
             if (lostTime > 0) {
                 console.log("Found time lost during reset: "+lostTime+" seconds after "+lastFiledate);
                 addUnrecordedData(lostTime);
@@ -595,9 +632,9 @@ function consumeFile(jsondata, filename) {
         }
     } else {
         console.log("Warning: relying on uptime only from "+lastUptime+" to "+uptime+" in file "+filename);
-        if (uptime - lastUptime > ringbufferSize) {
+        if (uptime - lastUptime > ringbufferSize(jsondata)) {
             // ring buffer overflowed, add missing and copy all
-            addUnrecordedData(uptime - lastUptime - ringbufferSize);
+            addUnrecordedData(uptime - lastUptime - ringbufferSize(jsondata));
             addAllData(jsondata, uptime);
         } else if (uptime < lastUptime) {
             // system reset betweeen then and now
@@ -616,7 +653,7 @@ function consumeFile(jsondata, filename) {
 
     if (startdate == null && filedate != null) {
         startdate = new Date(filedate);
-        startdate.setSeconds(startdate.getSeconds() - data.length);
+        startdate.setSeconds(startdate.getSeconds() - dataLength());
     }
 }
 
@@ -858,7 +895,7 @@ function loadList() {
                 filesToLoad.push(select.selectedOptions[i].value);
             }
 
-            data = [];
+            clearData();
             lastUptime = null;
             lastFiledate = null;
             connectedSpans = null;

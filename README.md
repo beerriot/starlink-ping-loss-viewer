@@ -1,12 +1,11 @@
-Is it possible to capture a picture of a Starlink dish's surroundings
-using the history data it exposes? The scripts and such in this repo
-are what I have pulled together to find out.
+What can we learn by looking more closely at a Starlink dish's history
+of connection data? The scripts and such in this repo are what I have
+pulled together to find out.
 
-There are three phases in this process, and the scripts for each phase
-are separated into the three subdirectories:
+There are two phases in this process, and the scripts for each phase
+are separated into the two subdirectories:
 
  * `downloader` collects data from the dish
- * `reducer` aggregates the data into a useful format
  * `viewer` presents a visual representation of the aggregated data
 
 These scripts were developed on a Mac running macOS 11.1. They use
@@ -53,58 +52,26 @@ If you want to stop collecting data, run `launchd unload
 ~/Library/LaunchAgents/StarlinkData.plist`.
 
 
-## Reducer / aggregation
-
-To view just one download, copy it, or symlink it, to
-`viewer/viewer-data.json`.
-
-If instead you'd like to view the content of multiple downloads at once,
-you'll need to reprocess them into a unified format. That's done with
-the scripts in the `reducer` directory.
-
-Assuming you have several downloads in a `data/` directory:
-
- 1. `cd data/`
- 2. `../reducer/extract-unique-times.zsh ../extract ../data/*`
-
-This should produce an equal number of identically-named files in the
-`extract` directory. These files have four major changes:
-
- 1. All information about throughput is removed
-
- 2. Information about ping drops, signal-to-noise ratio, obstructions,
-    an satellite schedules are aggregated into one array of objects,
-    instead of four separate arrays.
-
- 3. Ring buffers are unraveled, so that the earliest data in the file
-    is the first element of the `data` array, and the latest data is
-    the last.
-
- 4. Data is deduped. That is, data present in the second extracted
-    file includes only data that was not present in the first
-    extracted file. Put another way, any overlap is removed such that
-    after the first file, each file only represents the data that was
-    added in the new download.
-
-Aggregate all of your extractions, and prepare them for viewing using
-the other script in the `reducer/` directory:
-
- 1. `cd ..`
- 1. `reducer/concatenate-extracted-data.zsh extracted/* > viewer/viewer-data.json`
-
 ## Viewer / visual presentation
 
-The viewer is an HTML/SVG app. Start a webserver with the `viewer/`
-directory as its root. One easy way to do this:
+The viewer is an HTML/SVG app. It uses a small Python script to serve
+the collected data files to the app. If your data is stored in a
+directory named `/path/to/your/data`, start the Python script like so:
 
  1. `cd viewer/`
- 2. `python3 -m http.server`
+ 2. `./server.py /path/to/your/data`
 
 Open the page in your web browser: (http://localhost:8000/index.html)
 
-If the page loads correctly, you should see a handful of buttons and
-fields at the top, and a large white space with a bunch of red squares
-on it below that.
+If the page loads correctly, you should see a list of your collected
+data files in a box at the upper left. Click on any file to view
+it. If you select several files at once (via clicking and dragging,
+shift-clicking, command-clicking, or other means), the timespan they
+cover will be rendered together.
+
+If the rendering is successful, then below the selection box and the
+handful of buttons and fields next to it at the top at the top, a
+large white space with a bunch of colored squares will appear.
 
 Each red square is a 1-second interval where some number of pings was
 dropped, and the dish reported that they were dropped because of some
@@ -201,17 +168,44 @@ number of times where a span of the type of that row abuts a span of
 the type of that column. Percentages are of the total adjacencies for
 the row.
 
+## Reducer / aggregation
+
+If you would like to reclaim some disk space, a tool is included for
+removing the duplicated samples in each hour's data file. That tool is
+in the `reducer/` directory.
+
+To use it, first change to the directory where your data files live,
+then run `reducer/extract-unique-times.zsh`, passing as its first
+argument the directory where you would like the deduped data to end up
+(don't use "." because you'll overwrite the files there), and passing
+as its second through Nth arguments the files that you would like to
+deduplicate.
+
+For example, if I wanted to deduplicate all files for February 2021
+from my `data/` directory into my `dedupe/` directory, I would do the
+following:
+
+ 1. `cd data/`
+ 2. `../reducer/extract-unique-times.zsh ../dedupe 2021-02*.json`
+
+In addition to removing duplicate data, ring buffers are unraveled, so
+that the oldest sample is always the first in the arrays, and the
+newest data is always the last.
+
 ## Results
 
-The idea behind the viewer is that the beam between the dish and the
-satellite is something like a CRT, sweeping across the scenery as the
-satellite moves past. If the satellites are moving in semi-constant
-rings, while the earth turns beneath them, then each successive
-satellite in a ring passes just a little lower on the west horizon, or
-just a little higher on the east horizon. This should produce a
-succession of sweeps across the scene. If the dish connects to the
-next dish in the ring at a regular interval, then syncing up the sweep
-with the viewer should produce a scan of that region of the sky.
+The original idea behind the viewer wass that the beam between the dish
+and the satellite is something like a CRT, sweeping across the scenery
+as the satellite moves past. If the satellites are moving in
+semi-constant rings, while the earth turns beneath them, then each
+successive satellite in a ring passes just a little lower on the west
+horizon, or just a little higher on the east horizon. This should
+produce a succession of sweeps across the scene. If the dish connects
+to the next dish in the ring at a regular interval, then syncing up
+the sweep with the viewer should produce a scan of that region of the
+sky.
 
-Updates on what I've found so far are shared at
-(http://blog.beerriot.com/2021/02/14/starlink-raster-scan/).
+It didn't quite work out, as you can read at
+(http://blog.beerriot.com/2021/02/14/starlink-raster-scan/). But, I've
+been using the viewer to continue to get a clearer picture of the
+quality of my connection.

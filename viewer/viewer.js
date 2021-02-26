@@ -6,10 +6,14 @@ var data = null;
 // for analysis and rendering.
 function clearData() {
     data = {
+        "downlinkThroughputBps": [],
         "popPingDropRate": [],
         "obstructed": [],
         "scheduled": [],
         "snr": [],
+        "uplinkThroughputBps": [],
+
+        // computed, not read from file
         "unrecorded": []
     };
 }
@@ -17,10 +21,13 @@ function clearData() {
 // What values to put in the arrays above during periods where we have
 // no data. All fields added to `data` must be present here.
 let unrecordedTemplate = {
+    "downlinkThroughputBps": 0,
     "popPingDropRate": 1,
     "obstructed": false,
     "scheduled": true,
     "snr": 9,
+    "uplinkThroughputBps": 0,
+
     "unrecorded": true
 };
 
@@ -102,6 +109,14 @@ var colors = {
 var minLossRatioV = constrainedValue(0, 1);
 minLossRatioV(1);
 
+// Smallest data.downlinkThroughputBps[i] that overrides minLossRatio.
+var minDownBpsV = constrainedValue(0);
+minDownBpsV(1000000); // 1mbps
+
+// Smallest data.uplinkThroughputBps[i] that overrides minLossRatio.
+var minUpBpsV = constrainedValue(0);
+minUpBpsV(1000000); // 1mpbs
+
 // Largest data.snr[i] to render. (init == 0)
 var maxSnrV = constrainedValue(0, 9);
 
@@ -178,6 +193,8 @@ attachButtons("boxWidth", boxWidthV,
 attachButtons("boxHeight", boxHeightV,
               attachInput("boxHeight", boxHeightV, parseInt, rescale), rescale);
 attachInput("minLossRatio", minLossRatioV, parseFloat);
+attachInput("minDownBps", minDownBpsV, parseFloat);
+attachInput("minUpBps", minUpBpsV, parseFloat);
 attachInput("maxSnr", maxSnrV, parseFloat);
 attachInput("connectedMinSec", connectedMinSecV);
 attachInput("connectedMaxDSec", connectedMaxDSecV);
@@ -259,9 +276,11 @@ function dropType(i) {
          (data.obstructed[i] ? "obstructed" : "betadown"))
 }
 
-function shouldShowDropAt(index, minLossRatio) {
+function shouldShowDropAt(index, minLossRatio, minDownBps, minUpBps) {
     return display[dropType(index)] &&
-        (data.popPingDropRate[index] >= minLossRatio);
+        (data.popPingDropRate[index] >= minLossRatio) &&
+        (data.downlinkThroughputBps[index] < minDownBps) &&
+        (data.uplinkThroughputBps[index] < minUpBps);
 }
 
 function dataLength() {
@@ -328,6 +347,8 @@ function analyzeData() {
     var connectedMinSec = connectedMinSecV();
     var connectedMaxDSec = connectedMaxDSecV();
     var minLossRatio = minLossRatioV();
+    var minDownBps = minDownBpsV();
+    var minUpBps = minUpBpsV();
 
     // Number of consecutive non-outage seconds up to i
     var connectedLength = 0;
@@ -342,7 +363,7 @@ function analyzeData() {
     var dType = null;
 
     for (var i = 0; i < dataLength(); i++) {
-        if (!shouldShowDropAt(i, minLossRatio)) {
+        if (!shouldShowDropAt(i, minLossRatio, minDownBps, minUpBps)) {
             if (dLength > 0) {
                 addToHisto(dType, dLength);
                 addAdjacency("connected", dType);
@@ -402,6 +423,8 @@ function plotTimeseriesData() {
     var stripeLength = stripeLengthV();
     var offset = offsetV();
     var minLossRatio = minLossRatioV();
+    var minDownBps = minDownBpsV();
+    var minUpBps = minUpBpsV();
     var maxSnr = maxSnrV();
 
     viewer = document.createElementNS("http://www.w3.org/2000/svg", "svg")
@@ -468,7 +491,7 @@ function plotTimeseriesData() {
             snrLength = 0;
         }
 
-        if (shouldShowDropAt(i, minLossRatio)) {
+        if (shouldShowDropAt(i, minLossRatio, minDownBps, minUpBps)) {
             var newDType = dropType(i);
             if (newDType != dType || data.popPingDropRate[i] != dLevel) {
                 // drop span ended in a new drop span

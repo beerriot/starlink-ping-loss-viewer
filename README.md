@@ -71,8 +71,8 @@ cover will be rendered together. The "current" entry at the top of the
 list will request a fresh dump of data from the dish.
 
 If the rendering is successful, then below the selection box and the
-handful of buttons and fields next to it at the top at the top, a
-large white space with a bunch of colored squares will appear.
+fields next to it at the top at the top, a large white space with a
+bunch of colored squares will appear.
 
 Each red square is a 1-second interval where some number of pings was
 dropped, and the dish reported that they were dropped because of some
@@ -83,9 +83,7 @@ start again at the left on the next line down. The "stripe" field
 determines how many seconds are placed on each line. The "offset"
 field determines how many seconds to skip at the start of the
 data. The left-hand "box size" field determines the width of each
-rectangle, and the right-hand field determines the height. Buttons to
-the side of each field will increase or decrease the value of the
-field, or you can type the value you want.
+rectangle, and the right-hand field determines the height.
 
 The checkboxes determine which data is displayed.
 
@@ -113,6 +111,13 @@ category is displayed:
    of 1 means "all pings must be dropped", which seems to be the
    metric that Starlink uses for counting downtime. Valid values are
    decimals between 0 and 1.
+
+ * "min downlink bps" and "min uplink bps": Each of these overrides
+   the the decision of whether or not to show an outage, based on the
+   measured downlink or uplink throughput. If downlink throughput for
+   the second was higher than "min downlink bps", the outage is not
+   rendered. If uplink throughput for the second was higher than "min
+   uplink bps", the outage is not rendered.
 
  * "max snr": Determines highest signal-to-noise ratio worth
    rendering. The default of 0 renders only the darkest grey boxes,

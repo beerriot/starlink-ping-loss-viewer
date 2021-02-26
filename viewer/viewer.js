@@ -1,15 +1,17 @@
 // Samples will be loaded here.
 var data = [];
 
-// If we're loading unprocessed dumps, remember the last "current" (==
-// uptime) value, so we don't re-add that data.
+// Remember the last "current" (== uptime) value from the most
+// recently loaded file in the selected list, so we don't re-add that
+// data when consuming the next file.
 var lastUptime = null;
 
-// The date we read determined the last processed file was written.
+// The date we read determined the last consumed file was written.
 var lastFiledate = null;
 
 // Datetime of earliest sample.
 var startdate = null;
+
 // Spans of uninterrupted connectivity. Computed by analyzing `data` at plot time.
 var connectedSpans = null;
 // Histogram of span lengths. Computed by analyzing `data` at plot time.
@@ -514,7 +516,7 @@ function dateFromFilename(filename) {
     return null;
 }
 
-function processRawFileData(history, start, end) {
+function addData(history, start, end) {
     for (var i = start; i < end; i++) {
         data.push({
             d: history.popPingDropRate[i],
@@ -526,29 +528,29 @@ function processRawFileData(history, start, end) {
     }
 }
 
-function processAllRawFileData(jsondata, uptime) {
+function addAllData(jsondata, uptime) {
     var ringbufferSize = jsondata.dishGetHistory.popPingDropRate.length;
     if (uptime < ringbufferSize) {
-        processRawFileData(jsondata.dishGetHistory, 0, uptime);
+        addData(jsondata.dishGetHistory, 0, uptime);
     } else {
         var oldestPoint = uptime % ringbufferSize;
-        processRawFileData(jsondata.dishGetHistory, oldestPoint, ringbufferSize);
-        processRawFileData(jsondata.dishGetHistory, 0, oldestPoint);
+        addData(jsondata.dishGetHistory, oldestPoint, ringbufferSize);
+        addData(jsondata.dishGetHistory, 0, oldestPoint);
     }
 }
 
-function processContinuedRawFileData(jsondata, uptime) {
+function addContinuedData(jsondata, uptime) {
     var ringbufferSize = jsondata.dishGetHistory.popPingDropRate.length;
 
     var leftOffAt = lastUptime % ringbufferSize;
     var endOfLatest = uptime % ringbufferSize;
     if (leftOffAt < endOfLatest) {
         // haven't wrapped the ring buffer
-        processRawFileData(jsondata.dishGetHistory, leftOffAt, endOfLatest);
+        addData(jsondata.dishGetHistory, leftOffAt, endOfLatest);
     } else {
         // have wrapped the ring buffer
-        processRawFileData(jsondata.dishGetHistory, leftOffAt, ringbufferSize);
-        processRawFileData(jsondata.dishGetHistory, 0, endOfLatest);
+        addData(jsondata.dishGetHistory, leftOffAt, ringbufferSize);
+        addData(jsondata.dishGetHistory, 0, endOfLatest);
     }
 }
 
@@ -560,7 +562,7 @@ function addUnrecordedData(length) {
 }
 
 // Consume the raw grpcurl dishGetHistory response
-function processRawFile(jsondata, filename) {
+function consumeFile(jsondata, filename) {
     var uptime = parseInt(jsondata.dishGetHistory.current);
     var ringbufferSize = jsondata.dishGetHistory.popPingDropRate.length;
 
@@ -571,7 +573,7 @@ function processRawFile(jsondata, filename) {
 
     if (lastUptime == null) {
         // our first file
-        processAllRawFileData(jsondata, uptime);
+        addAllData(jsondata, uptime);
     } else if (filedate != null && lastFiledate != null) {
         var secondsSinceDate = (filedate - lastFiledate) / 1000;
         if (lastUptime > uptime ||
@@ -586,26 +588,26 @@ function processRawFile(jsondata, filename) {
                 addUnrecordedData(lostTime);
             }
 
-            processAllRawFileData(jsondata, uptime);
+            addAllData(jsondata, uptime);
         } else {
             // This is just continuation of the data in the previous file.
-            processContinuedRawFileData(jsondata, uptime);
+            addContinuedData(jsondata, uptime);
         }
     } else {
         console.log("Warning: relying on uptime only from "+lastUptime+" to "+uptime+" in file "+filename);
         if (uptime - lastUptime > ringbufferSize) {
             // ring buffer overflowed, add missing and copy all
             addUnrecordedData(uptime - lastUptime - ringbufferSize);
-            processAllRawFileData(jsondata, uptime);
+            addAllData(jsondata, uptime);
         } else if (uptime < lastUptime) {
             // system reset betweeen then and now
             console.log("Reset detected without date to work with at file "+filename);
-            processAllRawFileData(jsondata, uptime);
+            addAllData(jsondata, uptime);
         } else {
             // The happy path - uptime and lastUptime are related
             // and close enough to only need part of the ring
             // buffer.
-            processContinuedRawFileData(jsondata, uptime);
+            addContinuedData(jsondata, uptime);
         }
     }
 
@@ -615,36 +617,6 @@ function processRawFile(jsondata, filename) {
     if (startdate == null && filedate != null) {
         startdate = new Date(filedate);
         startdate.setSeconds(startdate.getSeconds() - data.length);
-    }
-}
-
-// Consume our preprocessed format
-function processPreprocessedFile(jsondata) {
-    data.concat(jsondata.data);
-
-    if (startdate == null) {
-        var lastFilename = null;
-        if ("filenames" in jsondata && jsondata.filenames.length > 0) {
-            lastFilename = jsondata.filenames[jsondata.filenames.length-1];
-        } else if ("filename" in jsondata) {
-            lastFilename = jsondata.filename;
-        }
-
-        if (lastFilename != null) {
-            startdate = dateFromFilename(lastFilename);
-
-            if (startdate != null) {
-                startdate.setSeconds(startdate.getSeconds() - data.length);
-            }
-        }
-    }
-}
-
-function processData(jsondata, filename) {
-    if ("data" in jsondata) {
-        processPreprocessedFile(jsondata);
-    } else {
-        processRawFile(jsondata, filename);
     }
 }
 
@@ -911,7 +883,7 @@ function loadFiles(filesToLoad) {
         var dataReq = new XMLHttpRequest();
         dataReq.addEventListener("load", function() {
             if (this.status == 200) {
-                processData(JSON.parse(this.responseText), nextfile);
+                consumeFile(JSON.parse(this.responseText), nextfile);
             } else {
                 console.log("Received non-200 status: "+this.status);
             }

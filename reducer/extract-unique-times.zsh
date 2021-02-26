@@ -47,9 +47,11 @@ while [[ -n $1 ]]; do
         if [[ -z $PREVIOUS || $PREVIOUS -gt $CURRENT ]]; then
             [[ -n $PREVIOUS ]] && echo "Warning: gap of unknown length detected"
             FIRST_SPAN="[0:$CURRENT]";
+            NEW_LENGTH=$CURRENT
         else
             # not the first file processed since the reset
             FIRST_SPAN="[$PREVIOUS:$CURRENT]";
+            NEW_LENGTH=$(( $CURRENT - $PREVIOUS ))
         fi;
     else
         # more than 12hr after reset
@@ -58,6 +60,7 @@ while [[ -n $1 ]]; do
             [[ -n $PREVIOUS ]] && echo "Warning: gap from ${PREVIOUS} to $(( $CURRENT - $LENGTH )) = $(( $CURRENT - $PREVIOUS - $LENGTH ))"
             FIRST_SPAN="[$(( $CURRENT % $LENGTH )):$LENGTH]"
             SECOND_SPAN="[0:$(( $CURRENT % $LENGTH ))]";
+            NEW_LENGTH=$LENGTH
         else
             if [[ $(( $CURRENT % $LENGTH )) -gt $(( $PREVIOUS % $LENGTH )) ]]; then
                 # haven't wrapped the ring buffer
@@ -67,22 +70,23 @@ while [[ -n $1 ]]; do
                 FIRST_SPAN="[$(( $PREVIOUS % $LENGTH)):$LENGTH]"
                 SECOND_SPAN="[0:$(( $CURRENT % $LENGTH ))]";
             fi;
+            NEW_LENGTH=$(( $CURRENT - $PREVIOUS ))
         fi;
     fi
 
-    echo "$1: time=$CURRENT buffer=$LENGTH next=$NEXT_DATAPOINT $FIRST_SPAN+$SECOND_SPAN"
+    echo "$1: time=$CURRENT buffer=$LENGTH next=$NEXT_DATAPOINT $FIRST_SPAN+$SECOND_SPAN=$NEW_LENGTH"
 
     if [[ -z $SECOND_SPAN ]]; then
-        QUERY="[.dishGetHistory.popPingDropRate${FIRST_SPAN}, .dishGetHistory.obstructed${FIRST_SPAN}, .dishGetHistory.scheduled${FIRST_SPAN}, .dishGetHistory.snr${FIRST_SPAN}]";
+        QUERY="downlinkThroughputBps: .downlinkThroughputBps${FIRST_SPAN}, obstructed: .obstructed${FIRST_SPAN}, popPingDropRate: .popPingDropRate${FIRST_SPAN}, popPingLatencyMs: .popPingLatencyMs${FIRST_SPAN}, scheduled: .scheduled${FIRST_SPAN}, snr: .snr${FIRST_SPAN}, uplinkThroughputBps: .uplinkThroughputBps${FIRST_SPAN}";
     else
-        QUERY="[.dishGetHistory.popPingDropRate${FIRST_SPAN}+.dishGetHistory.popPingDropRate${SECOND_SPAN}, .dishGetHistory.obstructed${FIRST_SPAN}+.dishGetHistory.obstructed${SECOND_SPAN}, .dishGetHistory.scheduled${FIRST_SPAN}+.dishGetHistory.scheduled${SECOND_SPAN}, .dishGetHistory.snr${FIRST_SPAN}+.dishGetHistory.snr${SECOND_SPAN}]";
+        QUERY="downlinkThroughputBps: (.downlinkThroughputBps${FIRST_SPAN}+.downlinkThroughputBps${SECOND_SPAN}), obstructed: (.obstructed${FIRST_SPAN}+.obstructed${SECOND_SPAN}), popPingDropRate: (.popPingDropRate${FIRST_SPAN}+.popPingDropRate${SECOND_SPAN}), popPingLatencyMs: (.popPingLatencyMs${FIRST_SPAN}+.popPingLatencyMs${SECOND_SPAN}), scheduled: (.scheduled${FIRST_SPAN}+.scheduled${SECOND_SPAN}), snr: (.snr${FIRST_SPAN}+.snr${SECOND_SPAN}), uplinkThroughputBps: (.uplinkThroughputBps${FIRST_SPAN}+.uplinkThroughputBps${SECOND_SPAN})";
     fi
 
     # (d)ropped packet ratio
     # (o)bstructed
     # (s)cheduled
     # signal-to-(n)oise ratio
-    jq "{filename:\"${1}\", current:.dishGetHistory.current, data:$QUERY|transpose|map({d:.[0],o:.[1],s:.[2],n:.[3]})}" $1 > $OUTDIR/$1
+    jq ".dishGetHistory|{dishGetHistory:{current:$NEW_LENGTH, $QUERY}}" $1 > $OUTDIR/$1
 
     # prepare for next iteration
     shift

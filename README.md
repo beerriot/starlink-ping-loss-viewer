@@ -67,7 +67,8 @@ If the page loads correctly, you should see a list of your collected
 data files in a box at the upper left. Click on any file to view
 it. If you select several files at once (via clicking and dragging,
 shift-clicking, command-clicking, or other means), the timespan they
-cover will be rendered together.
+cover will be rendered together. The "current" entry at the top of the
+list will request a fresh dump of data from the dish.
 
 If the rendering is successful, then below the selection box and the
 handful of buttons and fields next to it at the top at the top, a

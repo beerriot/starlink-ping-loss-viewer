@@ -49,6 +49,9 @@ var spanHisto = null;
 // Map of how often each span type abuts another.
 var adjacencies = null;
 
+// How many times downlink/uplink throughput overruled ping loss ratio.
+var outagesOverruled = null;
+
 // Rendering parameters are functions with captured values. The
 // function alters the captured value by the passed amount, and
 // returns the result after constraining it to the minimum and maximum
@@ -303,6 +306,7 @@ function plot() {
     plotTimeseriesData()
     plotHistogramData()
     plotAdjacencies()
+    plotOverrules()
 }
 
 function analyzeData() {
@@ -336,6 +340,13 @@ function analyzeData() {
         "unrecorded": {"total": 0, "obstructed": 0, "betadown": 0, "nosatellite": 0, "connected": 0}
     };
 
+    outagesOverruled = {
+        "obstructed": {down: 0, up: 0, either: 0, not: 0},
+        "betadown": {down: 0, up: 0, either: 0, not: 0},
+        "nosatellite": {down: 0, up: 0, either: 0, not: 0},
+        "unrecorded": {down: 0, up: 0, either: 0, not: 0}
+    };
+
     var addAdjacency = function(from, to) {
         adjacencies[from][to] += 1;
         adjacencies[from].total += 1;
@@ -364,6 +375,15 @@ function analyzeData() {
 
     for (var i = 0; i < dataLength(); i++) {
         if (!shouldShowDropAt(i, minLossRatio, minDownBps, minUpBps)) {
+            if (shouldShowDropAt(i, minLossRatio, Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER)) {
+                outagesOverruled[dropType(i)].either += 1;
+                if (!shouldShowDropAt(i, minLossRatio, minDownBps, Number.MAX_SAFE_INTEGER)) {
+                    outagesOverruled[dropType(i)].down += 1;
+                }
+                if (!shouldShowDropAt(i, minLossRatio, Number.MAX_SAFE_INTEGER, minUpBps)) {
+                    outagesOverruled[dropType(i)].up += 1;
+                }
+            }
             if (dLength > 0) {
                 addToHisto(dType, dLength);
                 addAdjacency("connected", dType);
@@ -375,6 +395,7 @@ function analyzeData() {
         } else {
             totalDLength += 1;
             var newDType = dropType(i);
+            outagesOverruled[newDType].not += 1;
 
             if (totalDLength > connectedMaxDSec) {
                 if (connectedLength > 0) {
@@ -893,6 +914,75 @@ function plotAdjacencies() {
     document.body.append(table);
 }
 
+function plotOverrules() {
+    if (outagesOverruled == null) {
+        console.log("No overruling data to plot!");
+        return;
+    }
+
+    var table = document.getElementById("overrules");
+    if (table != null) {
+        table.remove();
+    }
+
+    table = document.createElement("table");
+    table.setAttribute("id", "overrules");
+    var caption = document.createElement("caption");
+    caption.textContent = "Outage Overrulings (either + not = total)"
+    table.append(caption);
+
+    var types = ["obstructed", "betadown", "nosatellite"];
+
+    var tr = document.createElement("tr");
+    var th = document.createElement("th");
+    th.textContent = "Type";
+    tr.append(th);
+    th = document.createElement("th");
+    th.textContent = "Overruled Sec (downlink)";
+    tr.append(th);
+    th = document.createElement("th");
+    th.textContent = "Overruled Sec (uplink)";
+    tr.append(th);
+    th = document.createElement("th");
+    th.textContent = "Overruled Sec (either)";
+    tr.append(th);
+    th = document.createElement("th");
+    th.textContent = "Not Overruled Sec";
+    tr.append(th);
+    table.append(tr);
+
+    for (var r = 0; r < types.length; r++) {
+        tr = document.createElement("tr");
+        table.append(tr);
+
+        var td = document.createElement("td");
+        td.textContent = types[r];
+        tr.append(td);
+
+        td = document.createElement("td");
+        td.setAttribute("style", "text-align: right");
+        td.textContent = outagesOverruled[types[r]].down;
+        tr.append(td);
+
+        td = document.createElement("td");
+        td.setAttribute("style", "text-align: right");
+        td.textContent = outagesOverruled[types[r]].up;
+        tr.append(td);
+
+        td = document.createElement("td");
+        td.setAttribute("style", "text-align: right");
+        td.textContent = outagesOverruled[types[r]].either;
+        tr.append(td);
+
+        td = document.createElement("td");
+        td.setAttribute("style", "text-align: right");
+        td.textContent = outagesOverruled[types[r]].not;
+        tr.append(td);
+    }
+
+    document.body.append(table);
+}
+
 function loadList() {
     if (this.status == 200) {
         console.log("Received list "+this.responseText.length+" bytes");
@@ -924,6 +1014,7 @@ function loadList() {
             connectedSpans = null;
             spanHisto = null;
             adjacencies = null;
+            outagesOverruled = null;
             startdate = null;
             
             loadFiles(filesToLoad);

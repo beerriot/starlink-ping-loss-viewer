@@ -174,6 +174,15 @@ number of times where a span of the type of that row abuts a span of
 the type of that column. Percentages are of the total adjacencies for
 the row.
 
+Below the adjacencies table is a table of "overrulings". This provides
+a count of the number of times that downlink or uplink throughput was
+high enough to decide that a high ping loss rate did not indicate a
+lack of connection. The "downlink" and "uplink" counts are independent
+- if both rates were high enough, the overruling is counted in both
+columns. The "either" count is the total number of overrulings (count
+an overruling by both downlink and uplink rate only once), and the
+"not" count is the number of outages that were still counted.
+
 ## Reducer / aggregation
 
 If you would like to reclaim some disk space, a tool is included for

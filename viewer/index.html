@@ -14,7 +14,7 @@
           <td>
               <table>
                 <tr>
-                  <td colspan="3">
+                  <td>
                     <input id="obstructed" type="checkbox">obstructed</input>
                     <input id="betadown" type="checkbox">beta downtime</input>
                     <input id="nosatellite" type="checkbox">no satellites</input>
@@ -26,69 +26,21 @@
                   </td>
                 </tr>
                 <tr>
-                  <td colspan="3">
-                    min loss ratio <input id="minLossRatio" type="text" />
+                  <td>
+                    min loss ratio <input id="minLossRatio" type="text" size="5"/>
                   </td>
                   <td>
-                    max snr <input id="maxSnr" type="text" />
+                    max snr <input id="maxSnr" type="text" size="5"/>
                   </td>
                 </tr>
                 <tr>
                   <td><input id="connected" type="checkbox">connected</input></td>
-                  <td><input id="connectedMinSec" type="text"></input></td>
-                  <td><input id="connectedMaxDSec" type="text"></input></td>
                 </tr>
                 <tr>
-                  <td></td>
-                  <td>Min Clear Sec</td>
-                  <td>Max Down Sec</td>
-                </tr>
-              </table>
-              <table style="display: inline">
-                <tr>
-                  <td><button id="stripeLength_minus30">-30</button></td>
-                  <td><button id="stripeLength_minus10">-10</button></td>
-                  <td><button id="stripeLength_minus1">-1</button></td>
-                  <td><input id="stripeLength" type="text" size="5"></input></td>
-                  <td><button id="stripeLength_plus1">+1</button></td>
-                  <td><button id="stripeLength_plus10">+10</button></td>
-                  <td><button id="stripeLength_plus30">+30</button></td>
+                  <td>Min Clear Sec<input id="connectedMinSec" type="text" size="6"></input>&nbsp;Max Down Sec<input id="connectedMaxDSec" type="text" size="4"></input></td>
                 </tr>
                 <tr>
-                  <td colspan="7" style="text-align: center">stripe</td>
-                </tr>
-              </table>
-              <table style="display: inline">
-                <tr>
-                  <td>
-                    <button id="offset_minus30">-30</button>
-                    <button id="offset_minus10">-10</button>
-                    <button id="offset_minus1">-1</button>
-                    <input id="offset" type="text" size="7"></input>
-                    <button id="offset_plus1">+1</button>
-                    <button id="offset_plus10">+10</button>
-                    <button id="offset_plus30">+30</button>
-                  </td>
-                </tr>
-                <tr>
-                  <td style="text-align: center">offset</td>
-                </tr>
-              </table>
-              <table style="display: inline">
-                <tr>
-                  <td>
-                    <button id="boxWidth_minus1">-1</button>
-                    <input id="boxWidth" type="text" size="2"></input>
-                    <button id="boxWidth_plus1">+1</button>
-                  </td>
-                  <td>
-                    <button id="boxHeight_minus1">-1</button>
-                    <input id="boxHeight" type="text" size="2"></input>
-                    <button id="boxHeight_plus1">+1</button>
-                  </td>
-                </tr>
-                <tr>
-                  <td colspan="2" style="text-align: center">box size</td>
+                  <td>stripe<input id="stripeLength" type="text" size="5"></input>&nbsp;offset<input id="offset" type="text" size="7"></input>&nbsp;box&nbsp;size<input id="boxWidth" type="text" size="2"></input>x<input id="boxHeight" type="text" size="2"></input></td>
                 </tr>
               </table>
           </td>

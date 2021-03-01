@@ -850,7 +850,7 @@ function plotHistogramData() {
 
         barCount = 0;
         for (var k in spanHisto[i]) {
-            if (display[k]) {
+            if (display[k] && k != "unrecorded") {
                 addBar(i, barCount, spanHisto[i][k][0], colors[k]);
                 barCount += 1;
             }

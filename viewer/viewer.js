@@ -14,7 +14,12 @@ function clearData() {
         "uplinkThroughputBps": [],
 
         // computed, not read from file
-        "unrecorded": []
+
+        // Time between data dumps.
+        "unrecorded": [],
+
+        // Time reclassified from adjacent beta downtime
+        "adjacentObstructed": []
     };
 }
 
@@ -28,7 +33,8 @@ let unrecordedTemplate = {
     "snr": 9,
     "uplinkThroughputBps": 0,
 
-    "unrecorded": true
+    "unrecorded": true,
+    "adjacentObstructed": false
 };
 
 // Remember the last "current" (== uptime) value from the most
@@ -48,6 +54,8 @@ var connectedSpans = null;
 var spanHisto = null;
 // Map of how often each span type abuts another.
 var adjacencies = null;
+// How often a betadowntime of length N was reclassified as obstruction.
+var betaReclassifiedHisto = null;
 
 // How many times downlink/uplink throughput overruled ping loss ratio.
 var outagesOverruled = null;
@@ -92,6 +100,7 @@ var boxHeightV = constrainedValue(1, null, false);
 // Which items to display.
 var display = {
     "obstructed": true,
+    "adjacentObstructed": false,
     "betadown": true,
     "nosatellite": false,
     "snr": false,
@@ -219,6 +228,7 @@ attachCheckbox("betadown");
 attachCheckbox("nosatellite");
 attachCheckbox("snr");
 attachCheckbox("connected");
+attachCheckbox("adjacentObstructed");
 
 function makeBox(width, height, x, y, color, opacity) {
     var box = document.createElementNS("http://www.w3.org/2000/svg", "rect")
@@ -276,7 +286,9 @@ function makeSpans(stripeLength, start, end, color, opacity) {
 function dropType(i) {
     return data.unrecorded[i] ? "unrecorded" :
         (!data.scheduled[i] ? "nosatellite" :
-         (data.obstructed[i] ? "obstructed" : "betadown"))
+         (data.obstructed[i] ? "obstructed" :
+          (display.adjacentObstructed && data.adjacentObstructed[i] ?
+           "obstructed" : "betadown")))
 }
 
 function shouldShowDropAt(index, minLossRatio, minDownBps, minUpBps) {
@@ -347,6 +359,9 @@ function analyzeData() {
         "unrecorded": {down: 0, up: 0, either: 0, not: 0}
     };
 
+    betaReclassifiedHisto = new Array(120);
+    betaReclassifiedHisto.fill(0);
+
     var addAdjacency = function(from, to) {
         adjacencies[from][to] += 1;
         adjacencies[from].total += 1;
@@ -396,6 +411,35 @@ function analyzeData() {
             totalDLength += 1;
             var newDType = dropType(i);
             outagesOverruled[newDType].not += 1;
+
+            if (newDType == "obstructed") {
+                data.adjacentObstructed[i] = true;
+                var j = i-1;
+                while (j >= 0) {
+                    if (shouldShowDropAt(j, minLossRatio, minDownBps, minUpBps) &&
+                        dropType(j) == "betadown" && !data.adjacentObstructed[j]) {
+                        data.adjacentObstructed[j] = true;
+                    } else {
+                        j++;
+                        break;
+                    }
+                    j--;
+                }
+                betaReclassifiedHisto[Math.min(i-j, betaReclassifiedHisto.length-1)] += 1;
+
+                j = i+1;
+                while (j < dataLength()) {
+                    if (shouldShowDropAt(j, minLossRatio, minDownBps, minUpBps) &&
+                        dropType(j) == "betadown" && !data.adjacentObstructed[j]) {
+                        data.adjacentObstructed[j] = true;
+                    } else {
+                        j--;
+                        break;
+                    }
+                    j++;
+                }
+                betaReclassifiedHisto[Math.min(j-i, betaReclassifiedHisto.length-1)] += 1;
+            }
 
             if (totalDLength > connectedMaxDSec) {
                 if (connectedLength > 0) {
@@ -595,11 +639,11 @@ function dateFromFilename(filename) {
 
 function addData(jsondata, start, end) {
     for (var k in data) {
-        if (k == "unrecorded") {
-            // This one is our own, not part of Dishy's metrics.
-            var unrecorded = new Array(end-start);
-            unrecorded.fill(false);
-            data.unrecorded = data.unrecorded.concat(unrecorded);
+        if (k == "unrecorded" || k == "adjacentObstructed") {
+            // These are our own, not part of Dishy's metrics.
+            var sim = new Array(end-start);
+            sim.fill(false);
+            data[k] = data[k].concat(sim);
         } else {
             data[k] = data[k].concat(jsondata.dishGetHistory[k].slice(start, end));
         }
@@ -912,6 +956,33 @@ function plotAdjacencies() {
         }
     }
     document.body.append(table);
+
+    table = document.getElementById("betaReclassifiedHisto");
+    if (table) {
+        table.remove();
+    }
+    
+    table = document.createElement("table");
+    table.setAttribute("id", "betaReclassifiedHisto");
+
+    caption = document.createElement("caption");
+    caption.textContent = "Beta Downtimes Reclassified as Obstructions";
+    table.append(caption);
+
+    var trh = document.createElement("tr");
+    var trd = document.createElement("tr");
+    table.append(trh);
+    table.append(trd);
+    for (var i = 1; i < betaReclassifiedHisto.length; i++) {
+        th = document.createElement("th");
+        th.textContent = i+"s";
+        trh.append(th);
+
+        td = document.createElement("td");
+        td.textContent = betaReclassifiedHisto[i];
+        trd.append(td);
+    }
+    document.body.append(table);
 }
 
 function plotOverrules() {
@@ -1013,6 +1084,7 @@ function loadList() {
             lastFiledate = null;
             connectedSpans = null;
             spanHisto = null;
+            betaReclassifedHisto = null;
             adjacencies = null;
             outagesOverruled = null;
             startdate = null;

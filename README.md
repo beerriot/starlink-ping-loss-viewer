@@ -32,11 +32,11 @@ Also in the downloader directory is the file
 `fetch-data.sh` periodically. To use it:
 
  1. Copy `StarlinkData.plist` to `~/Library/LaunchAgents`
- 
+
  2. Edit `~/Library/LaunchAgents/StarlinkData.plist` to correct the
     path to the `fetch-data.sh` script (i.e. replace
     `/Users/bryan/projects` with wherever you downloaded this repo).
-    
+
  3. Run `launchd load ~/Library/LaunchAgents/StarlinkData.plist`
 
 The file is set up to download history data at three minutes past the
@@ -59,7 +59,9 @@ the collected data files to the app. If your data is stored in a
 directory named `/path/to/your/data`, start the Python script like so:
 
  1. `cd viewer/`
- 2. `./server.py /path/to/your/data`
+ 2. `./server.py starlink:/path/to/your/data`
+
+If you have more than one directory containing data you'd like to view, pass additional arguments to `server.py`. The `starlink` before the colon in the example above is the name of that data that will show up above the file selection list in the viewer. Give each path a different name (e.g. `./server.py startlink:/path/to/starlink-data DSL:/path/to/dsl-data hotspot:/path/to/hotspot-data`).
 
 Open the page in your web browser: (http://localhost:8000/index.html)
 
@@ -224,3 +226,26 @@ It didn't quite work out, as you can read at
 (http://blog.beerriot.com/2021/02/14/starlink-raster-scan/). But, I've
 been using the viewer to continue to get a clearer picture of the
 quality of my connection.
+
+## Pinger
+
+Recently added is another utility in the `pinger/` subdirectory. This
+is intended to be a quick-hack way to compare the connectedness of a
+non-starlink connection.
+
+The main script in the subdirectory, `collect-pings.py` pings 8.8.8.8
+once per second. Every 3600 pings (approximately once per hour), it
+writes a file to disk that records which of those pings succeeded. The
+file is not exactly the same format as Starlink's history response,
+but the `ping_returncode` field is close enough to `popPingDropRate`
+to allow the viewer to render it in the same format.
+
+The other two files in the subdirectory are support to keep this ping
+recording utility running in the background. The
+`background-collection.sh` script checks for a running
+`collect-pings.py` and starts a new one if it doesn't find one. The
+check is performed by writing the PID of the `collect-pings.py`
+process to a file, and then querying for that PID. The `crontab` file
+contains an example of how to automatically run
+`background-collection.sh` to make sure `collect-pings.py` gets
+restarted if it stops.

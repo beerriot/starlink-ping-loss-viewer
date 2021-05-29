@@ -1,0 +1,7 @@
+# Adding this line to your crontab will cause cron to check on the
+# ping utility once per hour, and restart it if it has stopped.
+# Be sure to change `/home/pi/pings` to the path where you want
+# ping results to be stored, and `./background-collection.sh` to
+# the correct path to that script.
+3 * * * * cd /home/pi/pings && ./background-collection.sh
+

@@ -920,6 +920,31 @@ function plotOverrules() {
     document.body.append(table);
 }
 
+function loadConnections() {
+    if (this.status == 200) {
+        var jsondata = JSON.parse(this.responseText);
+
+        document.getElementById("connectionPlaceholder").remove();
+        var select = document.getElementById("connection");
+
+        for (var i = 0; i < jsondata.connections.length; i++) {
+            var option = document.createElement("option");
+            option.setAttribute("value", jsondata.connections[i]);
+            option.textContent = jsondata.connections[i];
+            select.append(option);
+        }
+
+        var loadCurrent = function() {
+            var dataListReq = new XMLHttpRequest();
+            dataListReq.addEventListener("load", loadList);
+            dataListReq.open("GET", "/data/"+select.value);
+            dataListReq.send();
+        };
+        select.addEventListener("change", loadCurrent);
+        loadCurrent();
+    }
+}
+
 function loadList() {
     if (this.status == 200) {
         console.log("Received list "+this.responseText.length+" bytes");
@@ -938,24 +963,6 @@ function loadList() {
             select.append(option);
         }
 
-        select.addEventListener("change", function() {
-            // pick up files in reverse order so that we download oldest first
-            var filesToLoad = []
-            for (var i = select.selectedOptions.length - 1; i >= 0; i--) {
-                filesToLoad.push(select.selectedOptions[i].value);
-            }
-
-            clearData();
-            lastUptime = null;
-            lastFiledate = null;
-            connectedSpans = null;
-            spanHisto = null;
-            adjacencies = null;
-            outagesOverruled = null;
-            startdate = null;
-
-            loadFiles(filesToLoad);
-        });
     } else {
         document.getElementById("datafilePlaceholder").textContent =
             "Unable to load list ("+this.status+")";
@@ -963,10 +970,32 @@ function loadList() {
     }
 }
 
+document.getElementById("datafile").addEventListener("change", function() {
+    var select = document.getElementById("datafile");
+
+    // pick up files in reverse order so that we download oldest first
+    var filesToLoad = []
+    for (var i = select.selectedOptions.length - 1; i >= 0; i--) {
+        filesToLoad.push(select.selectedOptions[i].value);
+    }
+
+    clearData();
+    lastUptime = null;
+    lastFiledate = null;
+    connectedSpans = null;
+    spanHisto = null;
+    adjacencies = null;
+    outagesOverruled = null;
+    startdate = null;
+
+    loadFiles(filesToLoad);
+});
+
 function loadFiles(filesToLoad) {
     var nextfile = filesToLoad.shift();
     if (nextfile) {
-        var path = "/data/" + nextfile;
+        var path = "/data/" +
+            document.getElementById("connection").value + "/" + nextfile;
 
         var dataReq = new XMLHttpRequest();
         dataReq.addEventListener("load", function() {
@@ -985,6 +1014,6 @@ function loadFiles(filesToLoad) {
 }
 
 var dataListReq = new XMLHttpRequest();
-dataListReq.addEventListener("load", loadList);
+dataListReq.addEventListener("load", loadConnections);
 dataListReq.open("GET", "/data");
 dataListReq.send();

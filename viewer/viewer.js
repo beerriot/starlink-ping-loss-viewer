@@ -598,6 +598,7 @@ function addData(jsondata) {
             data[k] = data[k].concat(fakedata);
         }
     }
+    return jsondata.ping_returncode.length;
 }
 
 function addUnrecordedData(length) {

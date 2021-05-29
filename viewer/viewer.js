@@ -952,8 +952,10 @@ function loadList() {
 
         jsondata.data_files.sort();
 
-        document.getElementById("datafilePlaceholder").remove();
         var select = document.getElementById("datafile");
+        while (select.firstChild) {
+            select.removeChild(select.lastChild);
+        }
 
         // add in reverse order, so newest is at the top
         for (var i = jsondata.data_files.length - 1; i >= 0; i--) {

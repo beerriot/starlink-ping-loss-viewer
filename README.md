@@ -8,10 +8,11 @@ are separated into the two subdirectories:
  * `downloader` collects data from the dish
  * `viewer` presents a visual representation of the aggregated data
 
-These scripts were developed on a Mac running macOS 11.1. They use
-`zsh`. I /think/ there's nothing zsh-specific about them (so they may
-also work as bash), but I haven't tested. The scripts use `grpcurl`
-and `jq`, so you'll want those installed.
+These scripts were developed on a Mac running macOS 11.1 and a
+Raspberry Pi running Raspian 10 (buster). Some use `zsh`. I /think/
+there's nothing zsh-specific about them (so they may also work as
+bash), but I haven't tested. The scripts use `grpcurl` and `jq` and
+`python3`, so you'll want those installed.
 
 ## Downloader / collection
 
@@ -26,6 +27,8 @@ In the downloader directory, you'll find the `fetch-data.sh`
 script. This is a simple wrapper around `grpcurl` that downloads a
 JSON-ified `dishGetHistory` response into a file named for the
 date-time it was downloaded (YYYY-MM-DD-HHMMSS.json).
+
+### MacOS download automation
 
 Also in the downloader directory is the file
 `StarlinkData.plist`. This is a launchd definition to run
@@ -51,6 +54,11 @@ than 100mb per day.
 If you want to stop collecting data, run `launchd unload
 ~/Library/LaunchAgents/StarlinkData.plist`.
 
+### Linux download automation
+
+Also in the downloader directory is the file `crontab`. This is an
+example crontab specification to run the `fetch-data.sh` script a few
+times per day.
 
 ## Viewer / visual presentation
 

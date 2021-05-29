@@ -1,0 +1,4 @@
+# An example of how to run fetch-data.sh regularly using cron.
+# This dumps the dish history three times per day.
+58 7,15,23 * * * cd /home/pi/starlink-ping-loss-viewer/data && ../downloader/fetch-data.sh
+

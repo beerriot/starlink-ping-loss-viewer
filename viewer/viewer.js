@@ -31,6 +31,11 @@ let unrecordedTemplate = {
     "unrecorded": true
 };
 
+// Remember the last "current" (== uptime) value from the most
+// recently loaded file in the selected list, so we don't re-add that
+// data when consuming the next file.
+var lastUptime = null;
+
 // The date we read determined the last consumed file was written.
 var lastFiledate = null;
 
@@ -578,8 +583,9 @@ function plotTimeseriesData() {
     });
 }
 
+// Only used for Starlink filenames YYYY-MM-DD-HHmmSS
 function dateFromFilename(filename) {
-    var dateparts = filename.match(/(\d\d\d\d)-(\d\d)-(\d\d)T(\d\d):(\d\d):(\d\d)/)
+    var dateparts = filename.match(/(\d\d\d\d)-(\d\d)-(\d\d)-(\d\d)(\d\d)(\d\d)/)
     if (dateparts && dateparts.length == 7) {
         return new Date(dateparts[1], parseInt(dateparts[2])-1, dateparts[3], dateparts[4], dateparts[5], dateparts[6]);
     }
@@ -588,7 +594,8 @@ function dateFromFilename(filename) {
     return null;
 }
 
-function addData(jsondata) {
+// Data from ping utility in this repo
+function addPingerData(jsondata) {
     for (var k in data) {
         if (k == "popPingDropRate") {
             data[k] = data[k].concat(jsondata.ping_returncode);
@@ -601,6 +608,49 @@ function addData(jsondata) {
     return jsondata.ping_returncode.length;
 }
 
+// Data from Starlink's dishGetHistory
+function addStarlinkData(jsondata, start, end) {
+    for (var k in data) {
+        if (k == "unrecorded") {
+            // This one is our own, not part of Dishy's metrics.
+            var unrecorded = new Array(end-start);
+            unrecorded.fill(false);
+            data.unrecorded = data.unrecorded.concat(unrecorded);
+        } else {
+            data[k] = data[k].concat(jsondata.dishGetHistory[k].slice(start, end));
+        }
+    }
+}
+
+function ringbufferSize(jsondata) {
+    // There is no explicit length field. All arrays are the same
+    // length, so just return the length of one of them.
+    return jsondata.dishGetHistory.popPingDropRate.length;
+}
+
+function addAllData(jsondata, uptime) {
+    if (uptime < ringbufferSize(jsondata)) {
+        addStarlinkData(jsondata, 0, uptime);
+    } else {
+        var oldestPoint = uptime % ringbufferSize(jsondata);
+        addStarlinkData(jsondata, oldestPoint, ringbufferSize(jsondata));
+        addStarlinkData(jsondata, 0, oldestPoint);
+    }
+}
+
+function addContinuedData(jsondata, uptime) {
+    var leftOffAt = lastUptime % ringbufferSize(jsondata);
+    var endOfLatest = uptime % ringbufferSize(jsondata);
+    if (leftOffAt < endOfLatest) {
+        // haven't wrapped the ring buffer
+        addStarlinkData(jsondata, leftOffAt, endOfLatest);
+    } else {
+        // have wrapped the ring buffer
+        addStarlinkData(jsondata, leftOffAt, ringbufferSize(jsondata));
+        addStarlinkData(jsondata, 0, endOfLatest);
+    }
+}
+
 function addUnrecordedData(length) {
     var unrecordedValues = new Array(length);
     for (var k in data) {
@@ -609,8 +659,16 @@ function addUnrecordedData(length) {
     }
 }
 
-// Consume the raw grpcurl dishGetHistory response
 function consumeFile(jsondata, filename) {
+    if ("ping_returncode" in jsondata) {
+        consumePingerFile(jsondata, filename);
+    } else {
+        consumeStarlinkFile(jsondata, filename);
+    }
+}
+
+// Consume the included ping utility's output
+function consumePingerFile(jsondata, filename) {
     var filedate = new Date(jsondata.start_time);
 
     if (startdate == null) {
@@ -624,7 +682,7 @@ function consumeFile(jsondata, filename) {
         }
     }
 
-    var secondsAdded = addData(jsondata);
+    var secondsAdded = addPingerData(jsondata);
     lastFiledate = filedate;
     lastFiledate.setSeconds(filedate.getSeconds() + secondsAdded);
 
@@ -633,9 +691,66 @@ function consumeFile(jsondata, filename) {
         console.log("Warning: file recorded " +
                     ((enddate - lastFiledate) / 1000) +
                     " seconds fewer than it should have before " +
-                    enddate);
+                    enddate + " in " + filename);
+    }
+}
+
+// Consume the raw grpcurl dishGetHistory response
+function consumeStarlinkFile(jsondata, filename) {
+    var uptime = parseInt(jsondata.dishGetHistory.current);
+
+    var filedate = dateFromFilename(filename);
+    if (filedate == null) {
+        console.log("Could not determine datetime of file");
     }
 
+    if (lastUptime == null) {
+        // our first file
+        addAllData(jsondata, uptime);
+    } else if (filedate != null && lastFiledate != null) {
+        var secondsSinceDate = (filedate - lastFiledate) / 1000;
+        if (lastUptime > uptime ||
+            secondsSinceDate >= uptime ||
+            secondsSinceDate >= ringbufferSize(jsondata)) {
+            // Data in this file is unrelated to data in the previous file.
+
+            var lostTime = Math.max(secondsSinceDate-uptime,
+                                    secondsSinceDate-ringbufferSize(jsondata));
+            if (lostTime > 0) {
+                console.log("Found time lost during reset: "+lostTime+" seconds after "+lastFiledate);
+                addUnrecordedData(lostTime);
+            }
+
+            addAllData(jsondata, uptime);
+        } else {
+            // This is just continuation of the data in the previous file.
+            addContinuedData(jsondata, uptime);
+        }
+    } else {
+        console.log("Warning: relying on uptime only from "+lastUptime+" to "+uptime+" in file "+filename);
+        if (uptime - lastUptime > ringbufferSize(jsondata)) {
+            // ring buffer overflowed, add missing and copy all
+            addUnrecordedData(uptime - lastUptime - ringbufferSize(jsondata));
+            addAllData(jsondata, uptime);
+        } else if (uptime < lastUptime) {
+            // system reset betweeen then and now
+            console.log("Reset detected without date to work with at file "+filename);
+            addAllData(jsondata, uptime);
+        } else {
+            // The happy path - uptime and lastUptime are related
+            // and close enough to only need part of the ring
+            // buffer.
+            addContinuedData(jsondata, uptime);
+        }
+    }
+
+    lastUptime = uptime;
+    lastFiledate = filedate;
+
+    if (startdate == null && filedate != null) {
+        startdate = new Date(filedate);
+        startdate.setSeconds(startdate.getSeconds() - dataLength());
+    }
 }
 
 function addToHisto(type, seconds) {
